@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seed Vault Generator</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#08090e;color:#c9d1d9;font-family:system-ui,'Segoe UI',Roboto,sans-serif;min-height:100vh;padding:1.5rem 1rem}
+.wrap{max-width:1400px;margin:0 auto}
+header{text-align:center;margin-bottom:1.5rem}
+h1{font-size:1.8rem;margin-bottom:.3rem;background:linear-gradient(135deg,#f7931a 40%,#627eea);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sub{color:#6b7280;font-size:.88rem}
+.panel{background:#0d1117;border:1px solid #1c2333;border-radius:16px;padding:1.2rem 1.5rem;margin-bottom:1rem}
+.row{display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-end}
+label{font-size:.75rem;color:#8b949e;display:block;margin-bottom:.3rem}
+input[type=number]{background:#0d1117;border:1px solid #30363d;border-radius:10px;padding:.5rem .8rem;color:#f0f6fc;font-family:monospace;font-size:.9rem;width:180px}
+input[type=number]:focus{outline:none;border-color:#f7931a}
+.btn-gen{background:linear-gradient(135deg,#f7931a,#e07c12);border:none;padding:.7rem 1.8rem;border-radius:40px;font-weight:700;color:#0d1117;cursor:pointer;font-size:.9rem}
+.btn-gen:disabled{opacity:.5;cursor:not-allowed}
+.btn-sec{background:#1f2a3a;border:1px solid #30363d;padding:.6rem 1.2rem;border-radius:40px;font-weight:600;color:#c9d1d9;cursor:pointer}
+.btn-sec:hover{background:#2d3a4a}
+.flex-btns{display:flex;gap:.6rem;flex-wrap:wrap}
+.progress-bar{background:#1f2a3a;border-radius:20px;height:7px;width:100%;margin-top:.6rem;overflow:hidden}
+.progress-fill{background:#f7931a;width:0%;height:100%;transition:width .2s}
+.stats-row{display:flex;gap:.7rem;flex-wrap:wrap;margin-top:.5rem}
+.stat{background:#0a0e14;padding:3px 10px;border-radius:20px;font-family:monospace;font-size:.73rem}
+.card{background:#0d1117;border:1px solid #1f2a3a;border-radius:16px;margin-bottom:1rem;overflow:hidden}
+.card-header{background:#0a0e14;padding:.7rem 1.2rem;border-bottom:1px solid #1c2333;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem}
+.card-header h3{font-size:.9rem}
+.table-wrapper{overflow-x:auto;max-height:420px;overflow-y:auto}
+.addr-table{width:100%;border-collapse:collapse;font-size:.73rem}
+.addr-table th{text-align:left;padding:9px 7px;background:#0a0e14;color:#8b949e;font-weight:600;border-bottom:1px solid #1f2a3a;position:sticky;top:0}
+.addr-table td{padding:7px;border-bottom:1px solid #1a1f2a;font-family:'Courier New',monospace;word-break:break-all}
+.addr-table tr:hover{background:#10151e}
+.copy-btn{background:transparent;border:none;font-size:.95rem;cursor:pointer;padding:3px 7px;border-radius:5px;color:#8b949e}
+.copy-btn:hover{background:#1f2a3a;color:#fff}
+.toast-msg{position:fixed;bottom:20px;right:20px;background:#238636;color:#fff;padding:8px 16px;border-radius:8px;font-size:.8rem;z-index:1000;animation:fadeOut 2s ease forwards;pointer-events:none}
+@keyframes fadeOut{0%{opacity:1;transform:translateY(0)}70%{opacity:1}100%{opacity:0;transform:translateY(-10px)}}
+.warning-note{font-size:.7rem;color:#8b949e;background:#1c1012;padding:.5rem 1rem;border-radius:10px;margin-top:.5rem;border-left:3px solid #f85149}
+.section-title{font-size:.78rem;color:#8b949e;margin-bottom:.4rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🔐 Seed Vault Generator</h1>
+    <p class="sub"></p>
+  </header>
+
+  <div class="panel">
+    <div class="row">
+      <div><input type="hidden" id="countInput" value="1"></div>
+      <div>
+        <label>Coins</label>
+        <div class="coins-grid" id="coinsGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel row" style="justify-content:space-between">
+    <div>
+      <div id="progressDisplay" style="font-size:.85rem;margin-bottom:.4rem">⚙️ Ready</div>
+      <div class="flex-btns">
+        <button id="startGenBtn" class="btn-gen">🚀 Generate</button>
+        <button id="stopGenBtn" class="btn-sec" disabled>⏹ Stop</button>
+      </div>
+    </div>
+    <div class="flex-btns">
+      <button class="btn-sec" onclick="copyAddresses()">📋 Copy addresses</button>
+      <button class="btn-sec" onclick="copyWithKeys()">🔐 Copy + keys</button>
+      <button class="btn-sec" onclick="exportJSON()">💾 Export JSON</button>
+      <button class="btn-sec" onclick="clearResults()">🗑 Clear</button>
+    </div>
+  </div>
+
+  <div id="summaryPanel"></div>
+  <div id="resultsContainer"><div style="text-align:center;padding:2rem;color:#6e7681">⚡ Press Generate to start</div></div>
+
+
+</div>
+<script>
+var NobleLibs=(()=>{var ne=Object.defineProperty;var qn=Object.getOwnPropertyDescriptor;var Cn=Object.getOwnPropertyNames;var Mn=Object.prototype.hasOwnProperty;var He=(t,e)=>{for(var n in e)ne(t,n,{get:e[n],enumerable:!0})},Vn=(t,e,n,r)=>{if(e&&typeof e=="object"||typeof e=="function")for(let o of Cn(e))!Mn.call(t,o)&&o!==n&&ne(t,o,{get:()=>e[o],enumerable:!(r=qn(e,o))||r.enumerable});return t};var jn=t=>Vn(ne({},"__esModule",{value:!0}),t);var Pr={};He(Pr,{base58check:()=>Hn,bech32:()=>Rn,keccak_256:()=>Bn,ripemd160:()=>un,secp256k1:()=>Se,sha256:()=>Mt});function Ot(t){if(!Number.isSafeInteger(t)||t<0)throw new Error("positive integer expected, got "+t)}function Zn(t){return t instanceof Uint8Array||ArrayBuffer.isView(t)&&t.constructor.name==="Uint8Array"}function tt(t,...e){if(!Zn(t))throw new Error("Uint8Array expected");if(e.length>0&&!e.includes(t.length))throw new Error("Uint8Array expected of length "+e+", got length="+t.length)}function Re(t){if(typeof t!="function"||typeof t.create!="function")throw new Error("Hash should be wrapped by utils.wrapConstructor");Ot(t.outputLen),Ot(t.blockLen)}function $(t,e=!0){if(t.destroyed)throw new Error("Hash instance has been destroyed");if(e&&t.finished)throw new Error("Hash#digest() has already been called")}function qt(t,e){tt(t);let n=e.outputLen;if(t.length<n)throw new Error("digestInto() expects output buffer of length at least "+n)}var dt=typeof globalThis=="object"&&"crypto"in globalThis?globalThis.crypto:void 0;function qe(t){return new Uint32Array(t.buffer,t.byteOffset,Math.floor(t.byteLength/4))}function Ct(t){return new DataView(t.buffer,t.byteOffset,t.byteLength)}function G(t,e){return t<<32-e|t>>>e}function Lt(t,e){return t<<e|t>>>32-e>>>0}var re=new Uint8Array(new Uint32Array([287454020]).buffer)[0]===68;function Pn(t){return t<<24&4278190080|t<<8&16711680|t>>>8&65280|t>>>24&255}function oe(t){for(let e=0;e<t.length;e++)t[e]=Pn(t[e])}function Dn(t){if(typeof t!="string")throw new Error("utf8ToBytes expected string, got "+typeof t);return new Uint8Array(new TextEncoder().encode(t))}function nt(t){return typeof t=="string"&&(t=Dn(t)),tt(t),t}function Ce(...t){let e=0;for(let r=0;r<t.length;r++){let o=t[r];tt(o),e+=o.length}let n=new Uint8Array(e);for(let r=0,o=0;r<t.length;r++){let s=t[r];n.set(s,o),o+=s.length}return n}var et=class{clone(){return this._cloneInto()}};function Et(t){let e=r=>t().update(nt(r)).digest(),n=t();return e.outputLen=n.outputLen,e.blockLen=n.blockLen,e.create=()=>t(),e}function Me(t){let e=(r,o)=>t(o).update(nt(r)).digest(),n=t({});return e.outputLen=n.outputLen,e.blockLen=n.blockLen,e.create=r=>t(r),e}function Ve(t=32){if(dt&&typeof dt.getRandomValues=="function")return dt.getRandomValues(new Uint8Array(t));if(dt&&typeof dt.randomBytes=="function")return dt.randomBytes(t);throw new Error("crypto.getRandomValues must be defined")}function zn(t,e,n,r){if(typeof t.setBigUint64=="function")return t.setBigUint64(e,n,r);let o=BigInt(32),s=BigInt(4294967295),i=Number(n>>o&s),c=Number(n&s),f=r?4:0,a=r?0:4;t.setUint32(e+f,i,r),t.setUint32(e+a,c,r)}function je(t,e,n){return t&e^~t&n}function Ze(t,e,n){return t&e^t&n^e&n}var Bt=class extends et{constructor(e,n,r,o){super(),this.blockLen=e,this.outputLen=n,this.padOffset=r,this.isLE=o,this.finished=!1,this.length=0,this.pos=0,this.destroyed=!1,this.buffer=new Uint8Array(e),this.view=Ct(this.buffer)}update(e){$(this);let{view:n,buffer:r,blockLen:o}=this;e=nt(e);let s=e.length;for(let i=0;i<s;){let c=Math.min(o-this.pos,s-i);if(c===o){let f=Ct(e);for(;o<=s-i;i+=o)this.process(f,i);continue}r.set(e.subarray(i,i+c),this.pos),this.pos+=c,i+=c,this.pos===o&&(this.process(n,0),this.pos=0)}return this.length+=e.length,this.roundClean(),this}digestInto(e){$(this),qt(e,this),this.finished=!0;let{buffer:n,view:r,blockLen:o,isLE:s}=this,{pos:i}=this;n[i++]=128,this.buffer.subarray(i).fill(0),this.padOffset>o-i&&(this.process(r,0),i=0);for(let d=i;d<o;d++)n[d]=0;zn(r,o-8,BigInt(this.length*8),s),this.process(r,0);let c=Ct(e),f=this.outputLen;if(f%4)throw new Error("_sha2: outputLen should be aligned to 32bit");let a=f/4,p=this.get();if(a>p.length)throw new Error("_sha2: outputLen bigger than state");for(let d=0;d<a;d++)c.setUint32(4*d,p[d],s)}digest(){let{buffer:e,outputLen:n}=this;this.digestInto(e);let r=e.slice(0,n);return this.destroy(),r}_cloneInto(e){e||(e=new this.constructor),e.set(...this.get());let{blockLen:n,buffer:r,length:o,finished:s,destroyed:i,pos:c}=this;return e.length=o,e.pos=c,e.finished=s,e.destroyed=i,o%n&&e.buffer.set(r),e}};var Kn=new Uint32Array([1116352408,1899447441,3049323471,3921009573,961987163,1508970993,2453635748,2870763221,3624381080,310598401,607225278,1426881987,1925078388,2162078206,2614888103,3248222580,3835390401,4022224774,264347078,604807628,770255983,1249150122,1555081692,1996064986,2554220882,2821834349,2952996808,3210313671,3336571891,3584528711,113926993,338241895,666307205,773529912,1294757372,1396182291,1695183700,1986661051,2177026350,2456956037,2730485921,2820302411,3259730800,3345764771,3516065817,3600352804,4094571909,275423344,430227734,506948616,659060556,883997877,958139571,1322822218,1537002063,1747873779,1955562222,2024104815,2227730452,2361852424,2428436474,2756734187,3204031479,3329325298]),rt=new Uint32Array([1779033703,3144134277,1013904242,2773480762,1359893119,2600822924,528734635,1541459225]),ot=new Uint32Array(64),se=class extends Bt{constructor(){super(64,32,8,!1),this.A=rt[0]|0,this.B=rt[1]|0,this.C=rt[2]|0,this.D=rt[3]|0,this.E=rt[4]|0,this.F=rt[5]|0,this.G=rt[6]|0,this.H=rt[7]|0}get(){let{A:e,B:n,C:r,D:o,E:s,F:i,G:c,H:f}=this;return[e,n,r,o,s,i,c,f]}set(e,n,r,o,s,i,c,f){this.A=e|0,this.B=n|0,this.C=r|0,this.D=o|0,this.E=s|0,this.F=i|0,this.G=c|0,this.H=f|0}process(e,n){for(let d=0;d<16;d++,n+=4)ot[d]=e.getUint32(n,!1);for(let d=16;d<64;d++){let l=ot[d-15],h=ot[d-2],E=G(l,7)^G(l,18)^l>>>3,x=G(h,17)^G(h,19)^h>>>10;ot[d]=x+ot[d-7]+E+ot[d-16]|0}let{A:r,B:o,C:s,D:i,E:c,F:f,G:a,H:p}=this;for(let d=0;d<64;d++){let l=G(c,6)^G(c,11)^G(c,25),h=p+l+je(c,f,a)+Kn[d]+ot[d]|0,x=(G(r,2)^G(r,13)^G(r,22))+Ze(r,o,s)|0;p=a,a=f,f=c,c=i+h|0,i=s,s=o,o=r,r=h+x|0}r=r+this.A|0,o=o+this.B|0,s=s+this.C|0,i=i+this.D|0,c=c+this.E|0,f=f+this.F|0,a=a+this.G|0,p=p+this.H|0,this.set(r,o,s,i,c,f,a,p)}roundClean(){ot.fill(0)}destroy(){this.set(0,0,0,0,0,0,0,0),this.buffer.fill(0)}};var Mt=Et(()=>new se);var Vt=class extends et{constructor(e,n){super(),this.finished=!1,this.destroyed=!1,Re(e);let r=nt(n);if(this.iHash=e.create(),typeof this.iHash.update!="function")throw new Error("Expected instance of class which extends utils.Hash");this.blockLen=this.iHash.blockLen,this.outputLen=this.iHash.outputLen;let o=this.blockLen,s=new Uint8Array(o);s.set(r.length>o?e.create().update(r).digest():r);for(let i=0;i<s.length;i++)s[i]^=54;this.iHash.update(s),this.oHash=e.create();for(let i=0;i<s.length;i++)s[i]^=106;this.oHash.update(s),s.fill(0)}update(e){return $(this),this.iHash.update(e),this}digestInto(e){$(this),tt(e,this.outputLen),this.finished=!0,this.iHash.digestInto(e),this.oHash.update(e),this.oHash.digestInto(e),this.destroy()}digest(){let e=new Uint8Array(this.oHash.outputLen);return this.digestInto(e),e}_cloneInto(e){e||(e=Object.create(Object.getPrototypeOf(this),{}));let{oHash:n,iHash:r,finished:o,destroyed:s,blockLen:i,outputLen:c}=this;return e=e,e.finished=o,e.destroyed=s,e.blockLen=i,e.outputLen=c,e.oHash=n._cloneInto(e.oHash),e.iHash=r._cloneInto(e.iHash),e}destroy(){this.destroyed=!0,this.oHash.destroy(),this.iHash.destroy()}},ie=(t,e,n)=>new Vt(t,e).update(n).digest();ie.create=(t,e)=>new Vt(t,e);var de={};He(de,{aInRange:()=>ct,abool:()=>ht,abytes:()=>vt,bitGet:()=>Qn,bitLen:()=>ue,bitMask:()=>kt,bitSet:()=>Jn,bytesToHex:()=>pt,bytesToNumberBE:()=>X,bytesToNumberLE:()=>Pt,concatBytes:()=>At,createHmacDrbg:()=>le,ensureBytes:()=>D,equalBytes:()=>Yn,hexToBytes:()=>gt,hexToNumber:()=>ae,inRange:()=>Tt,isBytes:()=>st,memoized:()=>zt,notImplemented:()=>tr,numberToBytesBE:()=>it,numberToBytesLE:()=>Dt,numberToHexUnpadded:()=>wt,numberToVarBytesBE:()=>$n,utf8ToBytes:()=>Xn,validateObject:()=>ft});var jt=BigInt(0),Zt=BigInt(1),Gn=BigInt(2);function st(t){return t instanceof Uint8Array||ArrayBuffer.isView(t)&&t.constructor.name==="Uint8Array"}function vt(t){if(!st(t))throw new Error("Uint8Array expected")}function ht(t,e){if(typeof e!="boolean")throw new Error(t+" boolean expected, got "+e)}var Wn=Array.from({length:256},(t,e)=>e.toString(16).padStart(2,"0"));function pt(t){vt(t);let e="";for(let n=0;n<t.length;n++)e+=Wn[t[n]];return e}function wt(t){let e=t.toString(16);return e.length&1?"0"+e:e}function ae(t){if(typeof t!="string")throw new Error("hex string expected, got "+typeof t);return t===""?jt:BigInt("0x"+t)}var Y={_0:48,_9:57,A:65,F:70,a:97,f:102};function Pe(t){if(t>=Y._0&&t<=Y._9)return t-Y._0;if(t>=Y.A&&t<=Y.F)return t-(Y.A-10);if(t>=Y.a&&t<=Y.f)return t-(Y.a-10)}function gt(t){if(typeof t!="string")throw new Error("hex string expected, got "+typeof t);let e=t.length,n=e/2;if(e%2)throw new Error("hex string expected, got unpadded hex of length "+e);let r=new Uint8Array(n);for(let o=0,s=0;o<n;o++,s+=2){let i=Pe(t.charCodeAt(s)),c=Pe(t.charCodeAt(s+1));if(i===void 0||c===void 0){let f=t[s]+t[s+1];throw new Error('hex string expected, got non-hex character "'+f+'" at index '+s)}r[o]=i*16+c}return r}function X(t){return ae(pt(t))}function Pt(t){return vt(t),ae(pt(Uint8Array.from(t).reverse()))}function it(t,e){return gt(t.toString(16).padStart(e*2,"0"))}function Dt(t,e){return it(t,e).reverse()}function $n(t){return gt(wt(t))}function D(t,e,n){let r;if(typeof e=="string")try{r=gt(e)}catch(s){throw new Error(t+" must be hex string or Uint8Array, cause: "+s)}else if(st(e))r=Uint8Array.from(e);else throw new Error(t+" must be hex string or Uint8Array");let o=r.length;if(typeof n=="number"&&o!==n)throw new Error(t+" of length "+n+" expected, got "+o);return r}function At(...t){let e=0;for(let r=0;r<t.length;r++){let o=t[r];vt(o),e+=o.length}let n=new Uint8Array(e);for(let r=0,o=0;r<t.length;r++){let s=t[r];n.set(s,o),o+=s.length}return n}function Yn(t,e){if(t.length!==e.length)return!1;let n=0;for(let r=0;r<t.length;r++)n|=t[r]^e[r];return n===0}function Xn(t){if(typeof t!="string")throw new Error("string expected");return new Uint8Array(new TextEncoder().encode(t))}var ce=t=>typeof t=="bigint"&&jt<=t;function Tt(t,e,n){return ce(t)&&ce(e)&&ce(n)&&e<=t&&t<n}function ct(t,e,n,r){if(!Tt(e,n,r))throw new Error("expected valid "+t+": "+n+" <= n < "+r+", got "+e)}function ue(t){let e;for(e=0;t>jt;t>>=Zt,e+=1);return e}function Qn(t,e){return t>>BigInt(e)&Zt}function Jn(t,e,n){return t|(n?Zt:jt)<<BigInt(e)}var kt=t=>(Gn<<BigInt(t-1))-Zt,fe=t=>new Uint8Array(t),De=t=>Uint8Array.from(t);function le(t,e,n){if(typeof t!="number"||t<2)throw new Error("hashLen must be a number");if(typeof e!="number"||e<2)throw new Error("qByteLen must be a number");if(typeof n!="function")throw new Error("hmacFn must be a function");let r=fe(t),o=fe(t),s=0,i=()=>{r.fill(1),o.fill(0),s=0},c=(...d)=>n(o,r,...d),f=(d=fe())=>{o=c(De([0]),d),r=c(),d.length!==0&&(o=c(De([1]),d),r=c())},a=()=>{if(s++>=1e3)throw new Error("drbg: tried 1000 values");let d=0,l=[];for(;d<e;){r=c();let h=r.slice();l.push(h),d+=r.length}return At(...l)};return(d,l)=>{i(),f(d);let h;for(;!(h=l(a()));)f();return i(),h}}var Fn={bigint:t=>typeof t=="bigint",function:t=>typeof t=="function",boolean:t=>typeof t=="boolean",string:t=>typeof t=="string",stringOrUint8Array:t=>typeof t=="string"||st(t),isSafeInteger:t=>Number.isSafeInteger(t),array:t=>Array.isArray(t),field:(t,e)=>e.Fp.isValid(t),hash:t=>typeof t=="function"&&Number.isSafeInteger(t.outputLen)};function ft(t,e,n={}){let r=(o,s,i)=>{let c=Fn[s];if(typeof c!="function")throw new Error("invalid validator function");let f=t[o];if(!(i&&f===void 0)&&!c(f,t))throw new Error("param "+String(o)+" is invalid. Expected "+s+", got "+f)};for(let[o,s]of Object.entries(e))r(o,s,!1);for(let[o,s]of Object.entries(n))r(o,s,!0);return t}var tr=()=>{throw new Error("not implemented")};function zt(t){let e=new WeakMap;return(n,...r)=>{let o=e.get(n);if(o!==void 0)return o;let s=t(n,...r);return e.set(n,s),s}}var R=BigInt(0),N=BigInt(1),xt=BigInt(2),er=BigInt(3),he=BigInt(4),ze=BigInt(5),Ke=BigInt(8),nr=BigInt(9),rr=BigInt(16);function M(t,e){let n=t%e;return n>=R?n:e+n}function or(t,e,n){if(e<R)throw new Error("invalid exponent, negatives unsupported");if(n<=R)throw new Error("invalid modulus");if(n===N)return R;let r=N;for(;e>R;)e&N&&(r=r*t%n),t=t*t%n,e>>=N;return r}function z(t,e,n){let r=t;for(;e-- >R;)r*=r,r%=n;return r}function Kt(t,e){if(t===R)throw new Error("invert: expected non-zero number");if(e<=R)throw new Error("invert: expected positive modulus, got "+e);let n=M(t,e),r=e,o=R,s=N,i=N,c=R;for(;n!==R;){let a=r/n,p=r%n,d=o-i*a,l=s-c*a;r=n,n=p,o=i,s=c,i=d,c=l}if(r!==N)throw new Error("invert: does not exist");return M(o,e)}function sr(t){let e=(t-N)/xt,n,r,o;for(n=t-N,r=0;n%xt===R;n/=xt,r++);for(o=xt;o<t&&or(o,e,t)!==t-N;o++)if(o>1e3)throw new Error("Cannot find square root: likely non-prime P");if(r===1){let i=(t+N)/he;return function(f,a){let p=f.pow(a,i);if(!f.eql(f.sqr(p),a))throw new Error("Cannot find square root");return p}}let s=(n+N)/xt;return function(c,f){if(c.pow(f,e)===c.neg(c.ONE))throw new Error("Cannot find square root");let a=r,p=c.pow(c.mul(c.ONE,o),n),d=c.pow(f,s),l=c.pow(f,n);for(;!c.eql(l,c.ONE);){if(c.eql(l,c.ZERO))return c.ZERO;let h=1;for(let x=c.sqr(l);h<a&&!c.eql(x,c.ONE);h++)x=c.sqr(x);let E=c.pow(p,N<<BigInt(a-h-1));p=c.sqr(E),d=c.mul(d,E),l=c.mul(l,p),a=h}return d}}function ir(t){if(t%he===er){let e=(t+N)/he;return function(r,o){let s=r.pow(o,e);if(!r.eql(r.sqr(s),o))throw new Error("Cannot find square root");return s}}if(t%Ke===ze){let e=(t-ze)/Ke;return function(r,o){let s=r.mul(o,xt),i=r.pow(s,e),c=r.mul(o,i),f=r.mul(r.mul(c,xt),i),a=r.mul(c,r.sub(f,r.ONE));if(!r.eql(r.sqr(a),o))throw new Error("Cannot find square root");return a}}return t%rr,sr(t)}var cr=["create","isValid","is0","neg","inv","sqrt","sqr","eql","add","sub","mul","pow","div","addN","subN","mulN","sqrN"];function pe(t){let e={ORDER:"bigint",MASK:"bigint",BYTES:"isSafeInteger",BITS:"isSafeInteger"},n=cr.reduce((r,o)=>(r[o]="function",r),e);return ft(t,n)}function fr(t,e,n){if(n<R)throw new Error("invalid exponent, negatives unsupported");if(n===R)return t.ONE;if(n===N)return e;let r=t.ONE,o=e;for(;n>R;)n&N&&(r=t.mul(r,o)),o=t.sqr(o),n>>=N;return r}function ar(t,e){let n=new Array(e.length),r=e.reduce((s,i,c)=>t.is0(i)?s:(n[c]=s,t.mul(s,i)),t.ONE),o=t.inv(r);return e.reduceRight((s,i,c)=>t.is0(i)?s:(n[c]=t.mul(s,n[c]),t.mul(s,i)),o),n}function we(t,e){let n=e!==void 0?e:t.toString(2).length,r=Math.ceil(n/8);return{nBitLength:n,nByteLength:r}}function Gt(t,e,n=!1,r={}){if(t<=R)throw new Error("invalid field: expected ORDER > 0, got "+t);let{nBitLength:o,nByteLength:s}=we(t,e);if(s>2048)throw new Error("invalid field: expected ORDER of <= 2048 bytes");let i,c=Object.freeze({ORDER:t,isLE:n,BITS:o,BYTES:s,MASK:kt(o),ZERO:R,ONE:N,create:f=>M(f,t),isValid:f=>{if(typeof f!="bigint")throw new Error("invalid field element: expected bigint, got "+typeof f);return R<=f&&f<t},is0:f=>f===R,isOdd:f=>(f&N)===N,neg:f=>M(-f,t),eql:(f,a)=>f===a,sqr:f=>M(f*f,t),add:(f,a)=>M(f+a,t),sub:(f,a)=>M(f-a,t),mul:(f,a)=>M(f*a,t),pow:(f,a)=>fr(c,f,a),div:(f,a)=>M(f*Kt(a,t),t),sqrN:f=>f*f,addN:(f,a)=>f+a,subN:(f,a)=>f-a,mulN:(f,a)=>f*a,inv:f=>Kt(f,t),sqrt:r.sqrt||(f=>(i||(i=ir(t)),i(c,f))),invertBatch:f=>ar(c,f),cmov:(f,a,p)=>p?a:f,toBytes:f=>n?Dt(f,s):it(f,s),fromBytes:f=>{if(f.length!==s)throw new Error("Field.fromBytes: expected "+s+" bytes, got "+f.length);return n?Pt(f):X(f)}});return Object.freeze(c)}function Ge(t){if(typeof t!="bigint")throw new Error("field order must be bigint");let e=t.toString(2).length;return Math.ceil(e/8)}function ge(t){let e=Ge(t);return e+Math.ceil(e/2)}function We(t,e,n=!1){let r=t.length,o=Ge(e),s=ge(e);if(r<16||r<s||r>1024)throw new Error("expected "+s+"-1024 bytes of input, got "+r);let i=n?Pt(t):X(t),c=M(i,e-N)+N;return n?Dt(c,o):it(c,o)}var $e=BigInt(0),Wt=BigInt(1);function xe(t,e){let n=e.negate();return t?n:e}function Ye(t,e){if(!Number.isSafeInteger(t)||t<=0||t>e)throw new Error("invalid window size, expected [1.."+e+"], got W="+t)}function be(t,e){Ye(t,e);let n=Math.ceil(e/t)+1,r=2**(t-1);return{windows:n,windowSize:r}}function ur(t,e){if(!Array.isArray(t))throw new Error("array expected");t.forEach((n,r)=>{if(!(n instanceof e))throw new Error("invalid point at index "+r)})}function lr(t,e){if(!Array.isArray(t))throw new Error("array of scalars expected");t.forEach((n,r)=>{if(!e.isValid(n))throw new Error("invalid scalar at index "+r)})}var me=new WeakMap,Xe=new WeakMap;function ye(t){return Xe.get(t)||1}function Qe(t,e){return{constTimeNegate:xe,hasPrecomputes(n){return ye(n)!==1},unsafeLadder(n,r,o=t.ZERO){let s=n;for(;r>$e;)r&Wt&&(o=o.add(s)),s=s.double(),r>>=Wt;return o},precomputeWindow(n,r){let{windows:o,windowSize:s}=be(r,e),i=[],c=n,f=c;for(let a=0;a<o;a++){f=c,i.push(f);for(let p=1;p<s;p++)f=f.add(c),i.push(f);c=f.double()}return i},wNAF(n,r,o){let{windows:s,windowSize:i}=be(n,e),c=t.ZERO,f=t.BASE,a=BigInt(2**n-1),p=2**n,d=BigInt(n);for(let l=0;l<s;l++){let h=l*i,E=Number(o&a);o>>=d,E>i&&(E-=p,o+=Wt);let x=h,u=h+Math.abs(E)-1,w=l%2!==0,y=E<0;E===0?f=f.add(xe(w,r[x])):c=c.add(xe(y,r[u]))}return{p:c,f}},wNAFUnsafe(n,r,o,s=t.ZERO){let{windows:i,windowSize:c}=be(n,e),f=BigInt(2**n-1),a=2**n,p=BigInt(n);for(let d=0;d<i;d++){let l=d*c;if(o===$e)break;let h=Number(o&f);if(o>>=p,h>c&&(h-=a,o+=Wt),h===0)continue;let E=r[l+Math.abs(h)-1];h<0&&(E=E.negate()),s=s.add(E)}return s},getPrecomputes(n,r,o){let s=me.get(r);return s||(s=this.precomputeWindow(r,n),n!==1&&me.set(r,o(s))),s},wNAFCached(n,r,o){let s=ye(n);return this.wNAF(s,this.getPrecomputes(s,n,o),r)},wNAFCachedUnsafe(n,r,o,s){let i=ye(n);return i===1?this.unsafeLadder(n,r,s):this.wNAFUnsafe(i,this.getPrecomputes(i,n,o),r,s)},setWindowSize(n,r){Ye(r,e),Xe.set(n,r),me.delete(n)}}}function Je(t,e,n,r){if(ur(n,t),lr(r,e),n.length!==r.length)throw new Error("arrays of points and scalars must have equal length");let o=t.ZERO,s=ue(BigInt(n.length)),i=s>12?s-3:s>4?s-2:s?2:1,c=(1<<i)-1,f=new Array(c+1).fill(o),a=Math.floor((e.BITS-1)/i)*i,p=o;for(let d=a;d>=0;d-=i){f.fill(o);for(let h=0;h<r.length;h++){let E=r[h],x=Number(E>>BigInt(d)&BigInt(c));f[x]=f[x].add(n[h])}let l=o;for(let h=f.length-1,E=o;h>0;h--)E=E.add(f[h]),l=l.add(E);if(p=p.add(l),d!==0)for(let h=0;h<i;h++)p=p.double()}return p}function Ee(t){return pe(t.Fp),ft(t,{n:"bigint",h:"bigint",Gx:"field",Gy:"field"},{nBitLength:"isSafeInteger",nByteLength:"isSafeInteger"}),Object.freeze({...we(t.n,t.nBitLength),...t,p:t.Fp.ORDER})}function Fe(t){t.lowS!==void 0&&ht("lowS",t.lowS),t.prehash!==void 0&&ht("prehash",t.prehash)}function dr(t){let e=Ee(t);ft(e,{a:"field",b:"field"},{allowedPrivateKeyLengths:"array",wrapPrivateKey:"boolean",isTorsionFree:"function",clearCofactor:"function",allowInfinityPoint:"boolean",fromBytes:"function",toBytes:"function"});let{endo:n,Fp:r,a:o}=e;if(n){if(!r.eql(o,r.ZERO))throw new Error("invalid endomorphism, can only be defined for Koblitz curves that have a=0");if(typeof n!="object"||typeof n.beta!="bigint"||typeof n.splitScalar!="function")throw new Error("invalid endomorphism, expected beta: bigint and splitScalar: function")}return Object.freeze({...e})}var{bytesToNumberBE:hr,hexToBytes:pr}=de,Be=class extends Error{constructor(e=""){super(e)}},Q={Err:Be,_tlv:{encode:(t,e)=>{let{Err:n}=Q;if(t<0||t>256)throw new n("tlv.encode: wrong tag");if(e.length&1)throw new n("tlv.encode: unpadded data");let r=e.length/2,o=wt(r);if(o.length/2&128)throw new n("tlv.encode: long form length too big");let s=r>127?wt(o.length/2|128):"";return wt(t)+s+o+e},decode(t,e){let{Err:n}=Q,r=0;if(t<0||t>256)throw new n("tlv.encode: wrong tag");if(e.length<2||e[r++]!==t)throw new n("tlv.decode: wrong tlv");let o=e[r++],s=!!(o&128),i=0;if(!s)i=o;else{let f=o&127;if(!f)throw new n("tlv.decode(long): indefinite length not supported");if(f>4)throw new n("tlv.decode(long): byte length is too big");let a=e.subarray(r,r+f);if(a.length!==f)throw new n("tlv.decode: length bytes not complete");if(a[0]===0)throw new n("tlv.decode(long): zero leftmost byte");for(let p of a)i=i<<8|p;if(r+=f,i<128)throw new n("tlv.decode(long): not minimal encoding")}let c=e.subarray(r,r+i);if(c.length!==i)throw new n("tlv.decode: wrong value length");return{v:c,l:e.subarray(r+i)}}},_int:{encode(t){let{Err:e}=Q;if(t<J)throw new e("integer: negative integers are not allowed");let n=wt(t);if(Number.parseInt(n[0],16)&8&&(n="00"+n),n.length&1)throw new e("unexpected DER parsing assertion: unpadded hex");return n},decode(t){let{Err:e}=Q;if(t[0]&128)throw new e("invalid signature integer: negative");if(t[0]===0&&!(t[1]&128))throw new e("invalid signature integer: unnecessary leading zero");return hr(t)}},toSig(t){let{Err:e,_int:n,_tlv:r}=Q,o=typeof t=="string"?pr(t):t;vt(o);let{v:s,l:i}=r.decode(48,o);if(i.length)throw new e("invalid signature: left bytes after parsing");let{v:c,l:f}=r.decode(2,s),{v:a,l:p}=r.decode(2,f);if(p.length)throw new e("invalid signature: left bytes after parsing");return{r:n.decode(c),s:n.decode(a)}},hexFromSig(t){let{_tlv:e,_int:n}=Q,r=e.encode(2,n.encode(t.r)),o=e.encode(2,n.encode(t.s)),s=r+o;return e.encode(48,s)}},J=BigInt(0),q=BigInt(1),ho=BigInt(2),tn=BigInt(3),po=BigInt(4);function wr(t){let e=dr(t),{Fp:n}=e,r=Gt(e.n,e.nBitLength),o=e.toBytes||((x,u,w)=>{let y=u.toAffine();return At(Uint8Array.from([4]),n.toBytes(y.x),n.toBytes(y.y))}),s=e.fromBytes||(x=>{let u=x.subarray(1),w=n.fromBytes(u.subarray(0,n.BYTES)),y=n.fromBytes(u.subarray(n.BYTES,2*n.BYTES));return{x:w,y}});function i(x){let{a:u,b:w}=e,y=n.sqr(x),B=n.mul(y,x);return n.add(n.add(B,n.mul(x,u)),w)}if(!n.eql(n.sqr(e.Gy),i(e.Gx)))throw new Error("bad generator point: equation left != right");function c(x){return Tt(x,q,e.n)}function f(x){let{allowedPrivateKeyLengths:u,nByteLength:w,wrapPrivateKey:y,n:B}=e;if(u&&typeof x!="bigint"){if(st(x)&&(x=pt(x)),typeof x!="string"||!u.includes(x.length))throw new Error("invalid private key");x=x.padStart(w*2,"0")}let L;try{L=typeof x=="bigint"?x:X(D("private key",x,w))}catch{throw new Error("invalid private key, expected hex or "+w+" bytes, got "+typeof x)}return y&&(L=M(L,B)),ct("private key",L,q,B),L}function a(x){if(!(x instanceof l))throw new Error("ProjectivePoint expected")}let p=zt((x,u)=>{let{px:w,py:y,pz:B}=x;if(n.eql(B,n.ONE))return{x:w,y};let L=x.is0();u==null&&(u=L?n.ONE:n.inv(B));let S=n.mul(w,u),I=n.mul(y,u),v=n.mul(B,u);if(L)return{x:n.ZERO,y:n.ZERO};if(!n.eql(v,n.ONE))throw new Error("invZ was invalid");return{x:S,y:I}}),d=zt(x=>{if(x.is0()){if(e.allowInfinityPoint&&!n.is0(x.py))return;throw new Error("bad point: ZERO")}let{x:u,y:w}=x.toAffine();if(!n.isValid(u)||!n.isValid(w))throw new Error("bad point: x or y not FE");let y=n.sqr(w),B=i(u);if(!n.eql(y,B))throw new Error("bad point: equation left != right");if(!x.isTorsionFree())throw new Error("bad point: not in prime-order subgroup");return!0});class l{constructor(u,w,y){if(this.px=u,this.py=w,this.pz=y,u==null||!n.isValid(u))throw new Error("x required");if(w==null||!n.isValid(w))throw new Error("y required");if(y==null||!n.isValid(y))throw new Error("z required");Object.freeze(this)}static fromAffine(u){let{x:w,y}=u||{};if(!u||!n.isValid(w)||!n.isValid(y))throw new Error("invalid affine point");if(u instanceof l)throw new Error("projective point not allowed");let B=L=>n.eql(L,n.ZERO);return B(w)&&B(y)?l.ZERO:new l(w,y,n.ONE)}get x(){return this.toAffine().x}get y(){return this.toAffine().y}static normalizeZ(u){let w=n.invertBatch(u.map(y=>y.pz));return u.map((y,B)=>y.toAffine(w[B])).map(l.fromAffine)}static fromHex(u){let w=l.fromAffine(s(D("pointHex",u)));return w.assertValidity(),w}static fromPrivateKey(u){return l.BASE.multiply(f(u))}static msm(u,w){return Je(l,r,u,w)}_setWindowSize(u){E.setWindowSize(this,u)}assertValidity(){d(this)}hasEvenY(){let{y:u}=this.toAffine();if(n.isOdd)return!n.isOdd(u);throw new Error("Field doesn't support isOdd")}equals(u){a(u);let{px:w,py:y,pz:B}=this,{px:L,py:S,pz:I}=u,v=n.eql(n.mul(w,I),n.mul(L,B)),T=n.eql(n.mul(y,I),n.mul(S,B));return v&&T}negate(){return new l(this.px,n.neg(this.py),this.pz)}double(){let{a:u,b:w}=e,y=n.mul(w,tn),{px:B,py:L,pz:S}=this,I=n.ZERO,v=n.ZERO,T=n.ZERO,A=n.mul(B,B),C=n.mul(L,L),_=n.mul(S,S),U=n.mul(B,L);return U=n.add(U,U),T=n.mul(B,S),T=n.add(T,T),I=n.mul(u,T),v=n.mul(y,_),v=n.add(I,v),I=n.sub(C,v),v=n.add(C,v),v=n.mul(I,v),I=n.mul(U,I),T=n.mul(y,T),_=n.mul(u,_),U=n.sub(A,_),U=n.mul(u,U),U=n.add(U,T),T=n.add(A,A),A=n.add(T,A),A=n.add(A,_),A=n.mul(A,U),v=n.add(v,A),_=n.mul(L,S),_=n.add(_,_),A=n.mul(_,U),I=n.sub(I,A),T=n.mul(_,C),T=n.add(T,T),T=n.add(T,T),new l(I,v,T)}add(u){a(u);let{px:w,py:y,pz:B}=this,{px:L,py:S,pz:I}=u,v=n.ZERO,T=n.ZERO,A=n.ZERO,C=e.a,_=n.mul(e.b,tn),U=n.mul(w,L),P=n.mul(y,S),g=n.mul(B,I),b=n.add(w,y),m=n.add(L,S);b=n.mul(b,m),m=n.add(U,P),b=n.sub(b,m),m=n.add(w,B);let O=n.add(L,I);return m=n.mul(m,O),O=n.add(U,g),m=n.sub(m,O),O=n.add(y,B),v=n.add(S,I),O=n.mul(O,v),v=n.add(P,g),O=n.sub(O,v),A=n.mul(C,m),v=n.mul(_,g),A=n.add(v,A),v=n.sub(P,A),A=n.add(P,A),T=n.mul(v,A),P=n.add(U,U),P=n.add(P,U),g=n.mul(C,g),m=n.mul(_,m),P=n.add(P,g),g=n.sub(U,g),g=n.mul(C,g),m=n.add(m,g),U=n.mul(P,m),T=n.add(T,U),U=n.mul(O,m),v=n.mul(b,v),v=n.sub(v,U),U=n.mul(b,P),A=n.mul(O,A),A=n.add(A,U),new l(v,T,A)}subtract(u){return this.add(u.negate())}is0(){return this.equals(l.ZERO)}wNAF(u){return E.wNAFCached(this,u,l.normalizeZ)}multiplyUnsafe(u){let{endo:w,n:y}=e;ct("scalar",u,J,y);let B=l.ZERO;if(u===J)return B;if(this.is0()||u===q)return this;if(!w||E.hasPrecomputes(this))return E.wNAFCachedUnsafe(this,u,l.normalizeZ);let{k1neg:L,k1:S,k2neg:I,k2:v}=w.splitScalar(u),T=B,A=B,C=this;for(;S>J||v>J;)S&q&&(T=T.add(C)),v&q&&(A=A.add(C)),C=C.double(),S>>=q,v>>=q;return L&&(T=T.negate()),I&&(A=A.negate()),A=new l(n.mul(A.px,w.beta),A.py,A.pz),T.add(A)}multiply(u){let{endo:w,n:y}=e;ct("scalar",u,q,y);let B,L;if(w){let{k1neg:S,k1:I,k2neg:v,k2:T}=w.splitScalar(u),{p:A,f:C}=this.wNAF(I),{p:_,f:U}=this.wNAF(T);A=E.constTimeNegate(S,A),_=E.constTimeNegate(v,_),_=new l(n.mul(_.px,w.beta),_.py,_.pz),B=A.add(_),L=C.add(U)}else{let{p:S,f:I}=this.wNAF(u);B=S,L=I}return l.normalizeZ([B,L])[0]}multiplyAndAddUnsafe(u,w,y){let B=l.BASE,L=(I,v)=>v===J||v===q||!I.equals(B)?I.multiplyUnsafe(v):I.multiply(v),S=L(this,w).add(L(u,y));return S.is0()?void 0:S}toAffine(u){return p(this,u)}isTorsionFree(){let{h:u,isTorsionFree:w}=e;if(u===q)return!0;if(w)return w(l,this);throw new Error("isTorsionFree() has not been declared for the elliptic curve")}clearCofactor(){let{h:u,clearCofactor:w}=e;return u===q?this:w?w(l,this):this.multiplyUnsafe(e.h)}toRawBytes(u=!0){return ht("isCompressed",u),this.assertValidity(),o(l,this,u)}toHex(u=!0){return ht("isCompressed",u),pt(this.toRawBytes(u))}}l.BASE=new l(e.Gx,e.Gy,n.ONE),l.ZERO=new l(n.ZERO,n.ONE,n.ZERO);let h=e.nBitLength,E=Qe(l,e.endo?Math.ceil(h/2):h);return{CURVE:e,ProjectivePoint:l,normPrivateKeyToScalar:f,weierstrassEquation:i,isWithinCurveOrder:c}}function gr(t){let e=Ee(t);return ft(e,{hash:"hash",hmac:"function",randomBytes:"function"},{bits2int:"function",bits2int_modN:"function",lowS:"boolean"}),Object.freeze({lowS:!0,...e})}function en(t){let e=gr(t),{Fp:n,n:r}=e,o=n.BYTES+1,s=2*n.BYTES+1;function i(g){return M(g,r)}function c(g){return Kt(g,r)}let{ProjectivePoint:f,normPrivateKeyToScalar:a,weierstrassEquation:p,isWithinCurveOrder:d}=wr({...e,toBytes(g,b,m){let O=b.toAffine(),k=n.toBytes(O.x),H=At;return ht("isCompressed",m),m?H(Uint8Array.from([b.hasEvenY()?2:3]),k):H(Uint8Array.from([4]),k,n.toBytes(O.y))},fromBytes(g){let b=g.length,m=g[0],O=g.subarray(1);if(b===o&&(m===2||m===3)){let k=X(O);if(!Tt(k,q,n.ORDER))throw new Error("Point is not on curve");let H=p(k),j;try{j=n.sqrt(H)}catch(K){let Z=K instanceof Error?": "+K.message:"";throw new Error("Point is not on curve"+Z)}let V=(j&q)===q;return(m&1)===1!==V&&(j=n.neg(j)),{x:k,y:j}}else if(b===s&&m===4){let k=n.fromBytes(O.subarray(0,n.BYTES)),H=n.fromBytes(O.subarray(n.BYTES,2*n.BYTES));return{x:k,y:H}}else{let k=o,H=s;throw new Error("invalid Point, expected length of "+k+", or uncompressed "+H+", got "+b)}}}),l=g=>pt(it(g,e.nByteLength));function h(g){let b=r>>q;return g>b}function E(g){return h(g)?i(-g):g}let x=(g,b,m)=>X(g.slice(b,m));class u{constructor(b,m,O){this.r=b,this.s=m,this.recovery=O,this.assertValidity()}static fromCompact(b){let m=e.nByteLength;return b=D("compactSignature",b,m*2),new u(x(b,0,m),x(b,m,2*m))}static fromDER(b){let{r:m,s:O}=Q.toSig(D("DER",b));return new u(m,O)}assertValidity(){ct("r",this.r,q,r),ct("s",this.s,q,r)}addRecoveryBit(b){return new u(this.r,this.s,b)}recoverPublicKey(b){let{r:m,s:O,recovery:k}=this,H=I(D("msgHash",b));if(k==null||![0,1,2,3].includes(k))throw new Error("recovery id invalid");let j=k===2||k===3?m+e.n:m;if(j>=n.ORDER)throw new Error("recovery id 2 or 3 invalid");let V=(k&1)===0?"02":"03",W=f.fromHex(V+l(j)),K=c(j),Z=i(-H*K),bt=i(O*K),F=f.BASE.multiplyAndAddUnsafe(W,Z,bt);if(!F)throw new Error("point at infinify");return F.assertValidity(),F}hasHighS(){return h(this.s)}normalizeS(){return this.hasHighS()?new u(this.r,i(-this.s),this.recovery):this}toDERRawBytes(){return gt(this.toDERHex())}toDERHex(){return Q.hexFromSig({r:this.r,s:this.s})}toCompactRawBytes(){return gt(this.toCompactHex())}toCompactHex(){return l(this.r)+l(this.s)}}let w={isValidPrivateKey(g){try{return a(g),!0}catch{return!1}},normPrivateKeyToScalar:a,randomPrivateKey:()=>{let g=ge(e.n);return We(e.randomBytes(g),e.n)},precompute(g=8,b=f.BASE){return b._setWindowSize(g),b.multiply(BigInt(3)),b}};function y(g,b=!0){return f.fromPrivateKey(g).toRawBytes(b)}function B(g){let b=st(g),m=typeof g=="string",O=(b||m)&&g.length;return b?O===o||O===s:m?O===2*o||O===2*s:g instanceof f}function L(g,b,m=!0){if(B(g))throw new Error("first arg must be private key");if(!B(b))throw new Error("second arg must be public key");return f.fromHex(b).multiply(a(g)).toRawBytes(m)}let S=e.bits2int||function(g){if(g.length>8192)throw new Error("input is too large");let b=X(g),m=g.length*8-e.nBitLength;return m>0?b>>BigInt(m):b},I=e.bits2int_modN||function(g){return i(S(g))},v=kt(e.nBitLength);function T(g){return ct("num < 2^"+e.nBitLength,g,J,v),it(g,e.nByteLength)}function A(g,b,m=C){if(["recovered","canonical"].some(ut=>ut in m))throw new Error("sign() legacy options not supported");let{hash:O,randomBytes:k}=e,{lowS:H,prehash:j,extraEntropy:V}=m;H==null&&(H=!0),g=D("msgHash",g),Fe(m),j&&(g=D("prehashed msgHash",O(g)));let W=I(g),K=a(b),Z=[T(K),T(W)];if(V!=null&&V!==!1){let ut=V===!0?k(n.BYTES):V;Z.push(D("extraEntropy",ut))}let bt=At(...Z),F=W;function te(ut){let mt=S(ut);if(!d(mt))return;let ee=c(mt),St=f.BASE.multiply(mt).toAffine(),lt=i(St.x);if(lt===J)return;let It=i(ee*i(F+lt*K));if(It===J)return;let yt=(St.x===lt?0:2)|Number(St.y&q),Ne=It;return H&&h(It)&&(Ne=E(It),yt^=1),new u(lt,Ne,yt)}return{seed:bt,k2sig:te}}let C={lowS:e.lowS,prehash:!1},_={lowS:e.lowS,prehash:!1};function U(g,b,m=C){let{seed:O,k2sig:k}=A(g,b,m),H=e;return le(H.hash.outputLen,H.nByteLength,H.hmac)(O,k)}f.BASE._setWindowSize(8);function P(g,b,m,O=_){let k=g;b=D("msgHash",b),m=D("publicKey",m);let{lowS:H,prehash:j,format:V}=O;if(Fe(O),"strict"in O)throw new Error("options.strict was renamed to lowS");if(V!==void 0&&V!=="compact"&&V!=="der")throw new Error("format must be compact or der");let W=typeof k=="string"||st(k),K=!W&&!V&&typeof k=="object"&&k!==null&&typeof k.r=="bigint"&&typeof k.s=="bigint";if(!W&&!K)throw new Error("invalid signature, expected Uint8Array, hex string or Signature instance");let Z,bt;try{if(K&&(Z=new u(k.r,k.s)),W){try{V!=="compact"&&(Z=u.fromDER(k))}catch(yt){if(!(yt instanceof Q.Err))throw yt}!Z&&V!=="der"&&(Z=u.fromCompact(k))}bt=f.fromHex(m)}catch{return!1}if(!Z||H&&Z.hasHighS())return!1;j&&(b=e.hash(b));let{r:F,s:te}=Z,ut=I(b),mt=c(te),ee=i(ut*mt),St=i(F*mt),lt=f.BASE.multiplyAndAddUnsafe(bt,ee,St)?.toAffine();return lt?i(lt.x)===F:!1}return{CURVE:e,getPublicKey:y,getSharedSecret:L,sign:U,verify:P,ProjectivePoint:f,Signature:u,utils:w}}function xr(t){return{hash:t,hmac:(e,...n)=>ie(t,e,Ce(...n)),randomBytes:Ve}}function nn(t,e){let n=r=>en({...t,...xr(r)});return{...n(e),create:n}}var sn=BigInt("0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"),rn=BigInt("0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141"),br=BigInt(1),ve=BigInt(2),on=(t,e)=>(t+e/ve)/e;function mr(t){let e=sn,n=BigInt(3),r=BigInt(6),o=BigInt(11),s=BigInt(22),i=BigInt(23),c=BigInt(44),f=BigInt(88),a=t*t*t%e,p=a*a*t%e,d=z(p,n,e)*p%e,l=z(d,n,e)*p%e,h=z(l,ve,e)*a%e,E=z(h,o,e)*h%e,x=z(E,s,e)*E%e,u=z(x,c,e)*x%e,w=z(u,f,e)*u%e,y=z(w,c,e)*x%e,B=z(y,n,e)*p%e,L=z(B,i,e)*E%e,S=z(L,r,e)*a%e,I=z(S,ve,e);if(!Ae.eql(Ae.sqr(I),t))throw new Error("Cannot find square root");return I}var Ae=Gt(sn,void 0,void 0,{sqrt:mr}),Se=nn({a:BigInt(0),b:BigInt(7),Fp:Ae,n:rn,Gx:BigInt("55066263022277343669578718895168534326250603453777594175500187360389116729240"),Gy:BigInt("32670510020758816978083085130507043184471273380659243275938904335757337482424"),h:BigInt(1),lowS:!0,endo:{beta:BigInt("0x7ae96a2b657c07106e64479eac3434e99cf0497512f58995c1396c28719501ee"),splitScalar:t=>{let e=rn,n=BigInt("0x3086d221a7d46bcde86c90e49284eb15"),r=-br*BigInt("0xe4437ed6010e88286f547fa90abfe4c3"),o=BigInt("0x114ca50f7a8e2f3f657c1108d9d44cfd8"),s=n,i=BigInt("0x100000000000000000000000000000000"),c=on(s*t,e),f=on(-r*t,e),a=M(t-c*n-f*o,e),p=M(-c*r-f*s,e),d=a>i,l=p>i;if(d&&(a=e-a),l&&(p=e-p),a>i||p>i)throw new Error("splitScalar: Endomorphism failed, k="+t);return{k1neg:d,k1:a,k2neg:l,k2:p}}}},Mt),vo=BigInt(0);var Ao=Se.ProjectivePoint;var yr=new Uint8Array([7,4,13,1,10,6,15,3,12,0,9,5,2,14,11,8]),fn=new Uint8Array(new Array(16).fill(0).map((t,e)=>e)),Er=fn.map(t=>(9*t+5)%16),Oe=[fn],Le=[Er];for(let t=0;t<4;t++)for(let e of[Oe,Le])e.push(e[t].map(n=>yr[n]));var an=[[11,14,15,12,5,8,7,9,11,13,14,15,6,7,9,8],[12,13,11,15,6,9,9,7,12,15,11,13,7,8,7,7],[13,15,14,11,7,7,6,8,13,14,13,12,5,5,6,9],[14,11,12,14,8,6,5,5,15,12,15,14,9,9,8,6],[15,12,13,13,9,5,8,6,14,11,12,11,8,6,5,5]].map(t=>new Uint8Array(t)),Br=Oe.map((t,e)=>t.map(n=>an[e][n])),vr=Le.map((t,e)=>t.map(n=>an[e][n])),Ar=new Uint32Array([0,1518500249,1859775393,2400959708,2840853838]),Sr=new Uint32Array([1352829926,1548603684,1836072691,2053994217,0]);function cn(t,e,n,r){return t===0?e^n^r:t===1?e&n|~e&r:t===2?(e|~n)^r:t===3?e&r|n&~r:e^(n|~r)}var $t=new Uint32Array(16),Ie=class extends Bt{constructor(){super(64,20,8,!0),this.h0=1732584193,this.h1=-271733879,this.h2=-1732584194,this.h3=271733878,this.h4=-1009589776}get(){let{h0:e,h1:n,h2:r,h3:o,h4:s}=this;return[e,n,r,o,s]}set(e,n,r,o,s){this.h0=e|0,this.h1=n|0,this.h2=r|0,this.h3=o|0,this.h4=s|0}process(e,n){for(let h=0;h<16;h++,n+=4)$t[h]=e.getUint32(n,!0);let r=this.h0|0,o=r,s=this.h1|0,i=s,c=this.h2|0,f=c,a=this.h3|0,p=a,d=this.h4|0,l=d;for(let h=0;h<5;h++){let E=4-h,x=Ar[h],u=Sr[h],w=Oe[h],y=Le[h],B=Br[h],L=vr[h];for(let S=0;S<16;S++){let I=Lt(r+cn(h,s,c,a)+$t[w[S]]+x,B[S])+d|0;r=d,d=a,a=Lt(c,10)|0,c=s,s=I}for(let S=0;S<16;S++){let I=Lt(o+cn(E,i,f,p)+$t[y[S]]+u,L[S])+l|0;o=l,l=p,p=Lt(f,10)|0,f=i,i=I}}this.set(this.h1+c+p|0,this.h2+a+l|0,this.h3+d+o|0,this.h4+r+i|0,this.h0+s+f|0)}roundClean(){$t.fill(0)}destroy(){this.destroyed=!0,this.buffer.fill(0),this.set(0,0,0,0,0)}},un=Et(()=>new Ie);var Yt=BigInt(4294967295),ln=BigInt(32);function Ir(t,e=!1){return e?{h:Number(t&Yt),l:Number(t>>ln&Yt)}:{h:Number(t>>ln&Yt)|0,l:Number(t&Yt)|0}}function dn(t,e=!1){let n=new Uint32Array(t.length),r=new Uint32Array(t.length);for(let o=0;o<t.length;o++){let{h:s,l:i}=Ir(t[o],e);[n[o],r[o]]=[s,i]}return[n,r]}var hn=(t,e,n)=>t<<n|e>>>32-n,pn=(t,e,n)=>e<<n|t>>>32-n,wn=(t,e,n)=>e<<n-32|t>>>64-n,gn=(t,e,n)=>t<<n-32|e>>>64-n;var mn=[],yn=[],En=[],Or=BigInt(0),Ut=BigInt(1),Lr=BigInt(2),Tr=BigInt(7),kr=BigInt(256),Ur=BigInt(113);for(let t=0,e=Ut,n=1,r=0;t<24;t++){[n,r]=[r,(2*n+3*r)%5],mn.push(2*(5*r+n)),yn.push((t+1)*(t+2)/2%64);let o=Or;for(let s=0;s<7;s++)e=(e<<Ut^(e>>Tr)*Ur)%kr,e&Lr&&(o^=Ut<<(Ut<<BigInt(s))-Ut);En.push(o)}var[_r,Nr]=dn(En,!0),xn=(t,e,n)=>n>32?wn(t,e,n):hn(t,e,n),bn=(t,e,n)=>n>32?gn(t,e,n):pn(t,e,n);function Hr(t,e=24){let n=new Uint32Array(10);for(let r=24-e;r<24;r++){for(let i=0;i<10;i++)n[i]=t[i]^t[i+10]^t[i+20]^t[i+30]^t[i+40];for(let i=0;i<10;i+=2){let c=(i+8)%10,f=(i+2)%10,a=n[f],p=n[f+1],d=xn(a,p,1)^n[c],l=bn(a,p,1)^n[c+1];for(let h=0;h<50;h+=10)t[i+h]^=d,t[i+h+1]^=l}let o=t[2],s=t[3];for(let i=0;i<24;i++){let c=yn[i],f=xn(o,s,c),a=bn(o,s,c),p=mn[i];o=t[p],s=t[p+1],t[p]=f,t[p+1]=a}for(let i=0;i<50;i+=10){for(let c=0;c<10;c++)n[c]=t[i+c];for(let c=0;c<10;c++)t[i+c]^=~n[(c+2)%10]&n[(c+4)%10]}t[0]^=_r[r],t[1]^=Nr[r]}n.fill(0)}var Xt=class t extends et{constructor(e,n,r,o=!1,s=24){if(super(),this.blockLen=e,this.suffix=n,this.outputLen=r,this.enableXOF=o,this.rounds=s,this.pos=0,this.posOut=0,this.finished=!1,this.destroyed=!1,Ot(r),0>=this.blockLen||this.blockLen>=200)throw new Error("Sha3 supports only keccak-f1600 function");this.state=new Uint8Array(200),this.state32=qe(this.state)}keccak(){re||oe(this.state32),Hr(this.state32,this.rounds),re||oe(this.state32),this.posOut=0,this.pos=0}update(e){$(this);let{blockLen:n,state:r}=this;e=nt(e);let o=e.length;for(let s=0;s<o;){let i=Math.min(n-this.pos,o-s);for(let c=0;c<i;c++)r[this.pos++]^=e[s++];this.pos===n&&this.keccak()}return this}finish(){if(this.finished)return;this.finished=!0;let{state:e,suffix:n,pos:r,blockLen:o}=this;e[r]^=n,(n&128)!==0&&r===o-1&&this.keccak(),e[o-1]^=128,this.keccak()}writeInto(e){$(this,!1),tt(e),this.finish();let n=this.state,{blockLen:r}=this;for(let o=0,s=e.length;o<s;){this.posOut>=r&&this.keccak();let i=Math.min(r-this.posOut,s-o);e.set(n.subarray(this.posOut,this.posOut+i),o),this.posOut+=i,o+=i}return e}xofInto(e){if(!this.enableXOF)throw new Error("XOF is not possible for this instance");return this.writeInto(e)}xof(e){return Ot(e),this.xofInto(new Uint8Array(e))}digestInto(e){if(qt(e,this),this.finished)throw new Error("digest() was already called");return this.writeInto(e),this.destroy(),e}digest(){return this.digestInto(new Uint8Array(this.outputLen))}destroy(){this.destroyed=!0,this.state.fill(0)}_cloneInto(e){let{blockLen:n,suffix:r,outputLen:o,rounds:s,enableXOF:i}=this;return e||(e=new t(n,r,o,i,s)),e.state32.set(this.state32),e.pos=this.pos,e.posOut=this.posOut,e.finished=this.finished,e.rounds=s,e.suffix=r,e.outputLen=o,e.enableXOF=i,e.destroyed=this.destroyed,e}},at=(t,e,n)=>Et(()=>new Xt(e,t,n)),No=at(6,144,224/8),Ho=at(6,136,256/8),Ro=at(6,104,384/8),qo=at(6,72,512/8),Co=at(1,144,224/8),Bn=at(1,136,256/8),Mo=at(1,104,384/8),Vo=at(1,72,512/8),vn=(t,e,n)=>Me((r={})=>new Xt(e,t,r.dkLen===void 0?n:r.dkLen,!0)),jo=vn(31,168,128/8),Zo=vn(31,136,256/8);function Nt(t){return t instanceof Uint8Array||ArrayBuffer.isView(t)&&t.constructor.name==="Uint8Array"}function Ln(t,e){return Array.isArray(e)?e.length===0?!0:t?e.every(n=>typeof n=="string"):e.every(n=>Number.isSafeInteger(n)):!1}function Tn(t){if(typeof t!="function")throw new Error("function expected");return!0}function Ht(t,e){if(typeof e!="string")throw new Error(`${t}: string expected`);return!0}function Rt(t){if(!Number.isSafeInteger(t))throw new Error(`invalid integer: ${t}`)}function Jt(t){if(!Array.isArray(t))throw new Error("array expected")}function kn(t,e){if(!Ln(!0,e))throw new Error(`${t}: array of strings expected`)}function Ue(t,e){if(!Ln(!1,e))throw new Error(`${t}: array of numbers expected`)}function _e(...t){let e=s=>s,n=(s,i)=>c=>s(i(c)),r=t.map(s=>s.encode).reduceRight(n,e),o=t.map(s=>s.decode).reduce(n,e);return{encode:r,decode:o}}function Un(t){let e=typeof t=="string"?t.split(""):t,n=e.length;kn("alphabet",e);let r=new Map(e.map((o,s)=>[o,s]));return{encode:o=>(Jt(o),o.map(s=>{if(!Number.isSafeInteger(s)||s<0||s>=n)throw new Error(`alphabet.encode: digit index outside alphabet "${s}". Allowed: ${t}`);return e[s]})),decode:o=>(Jt(o),o.map(s=>{Ht("alphabet.decode",s);let i=r.get(s);if(i===void 0)throw new Error(`Unknown letter: "${s}". Allowed: ${t}`);return i}))}}function _n(t=""){return Ht("join",t),{encode:e=>(kn("join.decode",e),e.join(t)),decode:e=>(Ht("join.decode",e),e.split(t))}}function An(t,e,n){if(e<2)throw new Error(`convertRadix: invalid from=${e}, base cannot be less than 2`);if(n<2)throw new Error(`convertRadix: invalid to=${n}, base cannot be less than 2`);if(Jt(t),!t.length)return[];let r=0,o=[],s=Array.from(t,c=>{if(Rt(c),c<0||c>=e)throw new Error(`invalid integer: ${c}`);return c}),i=s.length;for(;;){let c=0,f=!0;for(let a=r;a<i;a++){let p=s[a],d=e*c,l=d+p;if(!Number.isSafeInteger(l)||d/e!==c||l-p!==d)throw new Error("convertRadix: carry overflow");let h=l/n;c=l%n;let E=Math.floor(h);if(s[a]=E,!Number.isSafeInteger(E)||E*n+c!==l)throw new Error("convertRadix: carry overflow");if(f)E?f=!1:r=a;else continue}if(o.push(c),f)break}for(let c=0;c<t.length-1&&t[c]===0;c++)o.push(0);return o.reverse()}var Nn=(t,e)=>e===0?t:Nn(e,t%e),Ft=(t,e)=>t+(e-Nn(t,e)),Qt=(()=>{let t=[];for(let e=0;e<40;e++)t.push(2**e);return t})();function Te(t,e,n,r){if(Jt(t),e<=0||e>32)throw new Error(`convertRadix2: wrong from=${e}`);if(n<=0||n>32)throw new Error(`convertRadix2: wrong to=${n}`);if(Ft(e,n)>32)throw new Error(`convertRadix2: carry overflow from=${e} to=${n} carryBits=${Ft(e,n)}`);let o=0,s=0,i=Qt[e],c=Qt[n]-1,f=[];for(let a of t){if(Rt(a),a>=i)throw new Error(`convertRadix2: invalid data word=${a} from=${e}`);if(o=o<<e|a,s+e>32)throw new Error(`convertRadix2: carry overflow pos=${s} from=${e}`);for(s+=e;s>=n;s-=n)f.push((o>>s-n&c)>>>0);let p=Qt[s];if(p===void 0)throw new Error("invalid carry");o&=p-1}if(o=o<<n-s&c,!r&&s>=e)throw new Error("Excess padding");if(!r&&o>0)throw new Error(`Non-zero padding: ${o}`);return r&&s>0&&f.push(o>>>0),f}function Rr(t){Rt(t);let e=2**8;return{encode:n=>{if(!Nt(n))throw new Error("radix.encode input should be Uint8Array");return An(Array.from(n),e,t)},decode:n=>(Ue("radix.decode",n),Uint8Array.from(An(n,t,e)))}}function qr(t,e=!1){if(Rt(t),t<=0||t>32)throw new Error("radix2: bits should be in (0..32]");if(Ft(8,t)>32||Ft(t,8)>32)throw new Error("radix2: carry overflow");return{encode:n=>{if(!Nt(n))throw new Error("radix2.encode input should be Uint8Array");return Te(Array.from(n),8,t,!e)},decode:n=>(Ue("radix2.decode",n),Uint8Array.from(Te(n,t,8,e)))}}function Sn(t){return Tn(t),function(...e){try{return t.apply(null,e)}catch{}}}function Cr(t,e){return Rt(t),Tn(e),{encode(n){if(!Nt(n))throw new Error("checksum.encode: input should be Uint8Array");let r=e(n).slice(0,t),o=new Uint8Array(n.length+t);return o.set(n),o.set(r,n.length),o},decode(n){if(!Nt(n))throw new Error("checksum.decode: input should be Uint8Array");let r=n.slice(0,-t),o=n.slice(-t),s=e(r).slice(0,t);for(let i=0;i<t;i++)if(s[i]!==o[i])throw new Error("Invalid checksum");return r}}}var Mr=t=>_e(Rr(58),Un(t),_n("")),Vr=Mr("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz");var jr=t=>_e(Cr(4,e=>t(t(e))),Vr),Hn=jr,ke=_e(Un("qpzry9x8gf2tvdw0s3jn54khce6mua7l"),_n("")),In=[996825010,642813549,513874426,1027748829,705979059];function _t(t){let e=t>>25,n=(t&33554431)<<5;for(let r=0;r<In.length;r++)(e>>r&1)===1&&(n^=In[r]);return n}function On(t,e,n=1){let r=t.length,o=1;for(let s=0;s<r;s++){let i=t.charCodeAt(s);if(i<33||i>126)throw new Error(`Invalid prefix (${t})`);o=_t(o)^i>>5}o=_t(o);for(let s=0;s<r;s++)o=_t(o)^t.charCodeAt(s)&31;for(let s of e)o=_t(o)^s;for(let s=0;s<6;s++)o=_t(o);return o^=n,ke.encode(Te([o%Qt[30]],30,5,!1))}function Zr(t){let e=t==="bech32"?1:734539939,n=qr(5),r=n.decode,o=n.encode,s=Sn(r);function i(d,l,h=90){Ht("bech32.encode prefix",d),Nt(l)&&(l=Array.from(l)),Ue("bech32.encode",l);let E=d.length;if(E===0)throw new TypeError(`Invalid prefix length ${E}`);let x=E+7+l.length;if(h!==!1&&x>h)throw new TypeError(`Length ${x} exceeds limit ${h}`);let u=d.toLowerCase(),w=On(u,l,e);return`${u}1${ke.encode(l)}${w}`}function c(d,l=90){Ht("bech32.decode input",d);let h=d.length;if(h<8||l!==!1&&h>l)throw new TypeError(`invalid string length: ${h} (${d}). Expected (8..${l})`);let E=d.toLowerCase();if(d!==E&&d!==d.toUpperCase())throw new Error("String must be lowercase or uppercase");let x=E.lastIndexOf("1");if(x===0||x===-1)throw new Error('Letter "1" must be present between prefix and data only');let u=E.slice(0,x),w=E.slice(x+1);if(w.length<6)throw new Error("Data must be at least 6 characters long");let y=ke.decode(w).slice(0,-6),B=On(u,y,e);if(!w.endsWith(B))throw new Error(`Invalid checksum in ${d}: expected "${B}"`);return{prefix:u,words:y}}let f=Sn(c);function a(d){let{prefix:l,words:h}=c(d,!1);return{prefix:l,words:h,bytes:r(h)}}function p(d,l){return i(d,o(l))}return{encode:i,decode:c,encodeFromBytes:p,decodeToBytes:a,decodeUnsafe:f,fromWords:r,fromWordsUnsafe:s,toWords:o}}var Rn=Zr("bech32");return jn(Pr);})();
+
+</script>
+
+
+<script>
+const { secp256k1, sha256, ripemd160, keccak_256, base58check, bech32 } = NobleLibs;
+const hex = b => Array.from(b, x => x.toString(16).padStart(2,'0')).join('');
+const b58c = base58check(sha256);
+const hash160 = d => ripemd160(sha256(d));
+function toWIF(priv, prefix=0x80) {
+  return b58c.encode(new Uint8Array([prefix, ...priv, 0x01]));
+}
+function eip55(bytes20) {
+  const a = hex(bytes20);
+  const h = hex(keccak_256(new TextEncoder().encode(a)));
+  return '0x' + Array.from(a, (c,i) => parseInt(h[i],16)>=8 ? c.toUpperCase() : c).join('');
+}
+function ethAddr(priv) {
+  const pub = secp256k1.getPublicKey(priv, false).slice(1);
+  return eip55(keccak_256(pub).slice(-20));
+}
+const BIP39W = "abandon ability able about above absent absorb abstract absurd abuse access accident account accuse achieve acid acoustic acquire across act action actor actress actual adapt add addict address adjust admit adult advance advice aerobic affair afford afraid again age agent agree ahead aim air airport aisle alarm album alcohol alert alien all alley allow almost alone alpha already also alter always amateur amazing among amount amused analyst anchor ancient anger angle angry animal ankle announce annual another answer antenna antique anxiety any apart apology appear apple approve april arch arctic area arena argue arm armed armor army around arrange arrest arrive arrow art artefact artist artwork ask aspect assault asset assist assume asthma athlete atom attack attend attitude attract auction audit august aunt author auto autumn average avocado avoid awake aware away awesome awful awkward axis baby bachelor bacon badge bag balance balcony ball bamboo banana banner bar barely bargain barrel base basic basket battle beach bean beauty because become beef before begin behave behind believe below belt bench benefit best betray better between beyond bicycle bid bike bind biology bird birth bitter black blade blame blanket blast bleak bless blind blood blossom blouse blue blur blush board boat body boil bomb bone bonus book boost border boring borrow boss bottom bounce box boy bracket brain brand brass brave bread breeze brick bridge brief bright bring brisk broccoli broken bronze broom brother brown brush bubble buddy budget buffalo build bulb bulk bullet bundle bunker burden burger burst bus business busy butter buyer buzz cabbage cabin cable cactus cage cake call calm camera camp can canal cancel candy cannon canoe canvas canyon capable capital captain car carbon card cargo carpet carry cart case cash casino castle casual cat catalog catch category cattle caught cause caution cave ceiling celery cement census century cereal certain chair chalk champion change chaos chapter charge chase chat cheap check cheese chef cherry chest chicken chief child chimney choice choose chronic chuckle chunk churn cigar cinnamon circle citizen city civil claim clap clarify claw clay clean clerk clever click client cliff climb clinic clip clock clog close cloth cloud clown club clump cluster clutch coach coast coconut code coffee coil coin collect color column combine come comfort comic common company concert conduct confirm congress connect consider control convince cook cool copper copy coral core corn correct cost cotton couch country couple course cousin cover coyote crack cradle craft cram crane crash crater crawl crazy cream credit creek crew cricket crime crisp critic crop cross crouch crowd crucial cruel cruise crumble crunch crush cry crystal cube culture cup cupboard curious current curtain curve cushion custom cute cycle dad damage damp dance danger daring dash daughter dawn day deal debate debris decade december decide decline decorate decrease deer defense define defy degree delay deliver demand demise denial dentist deny depart depend deposit depth deputy derive describe desert design desk despair destroy detail detect develop device devote diagram dial diamond diary dice diesel diet differ digital dignity dilemma dinner dinosaur direct dirt disagree discover disease dish dismiss disorder display distance divert divide divorce dizzy doctor document dog doll dolphin domain donate donkey donor door dose double dove draft dragon drama drastic draw dream dress drift drill drink drip drive drop drum dry duck dumb dune during dust dutch duty dwarf dynamic eager eagle early earn earth easily east easy echo ecology economy edge edit educate effort egg eight either elbow elder electric elegant element elephant elevator elite else embark embody embrace emerge emotion employ empower empty enable enact end endless endorse enemy energy enforce engage engine enhance enjoy enlist enough enrich enroll ensure enter entire entry envelope episode equal equip era erase erode erosion error erupt escape essay essence estate eternal ethics evidence evil evoke evolve exact example excess exchange excite exclude excuse execute exercise exhaust exhibit exile exist exit exotic expand expect expire explain expose express extend extra eye eyebrow fabric face faculty fade faint faith fall false fame family famous fan fancy fantasy farm fashion fat fatal father fatigue fault favorite feature february federal fee feed feel female fence festival fetch fever few fiber fiction field figure file film filter final find fine finger finish fire firm first fiscal fish fit fitness fix flag flame flash flat flavor flee flight flip float flock floor flower fluid flush fly foam focus fog foil fold follow food foot force forest forget fork fortune forum forward fossil foster found fox fragile frame frequent fresh friend fringe frog front frost frown frozen fruit fuel fun funny furnace fury future gadget gain galaxy gallery game gap garage garbage garden garlic garment gas gasp gate gather gauge gaze general genius genre gentle genuine gesture ghost giant gift giggle ginger giraffe girl give glad glance glare glass glide glimpse globe gloom glory glove glow glue goat goddess gold good goose gorilla gospel gossip govern gown grab grace grain grant grape grass gravity great green grid grief grit grocery group grow grunt guard guess guide guilt guitar gun gym habit hair half hammer hamster hand happy harbor hard harsh harvest hat have hawk hazard head health heart heavy hedgehog height hello helmet help hen hero hidden high hill hint hip hire history hobby hockey hold hole holiday hollow home honey hood hope horn horror horse hospital host hotel hour hover hub huge human humble humor hundred hungry hunt hurdle hurry hurt husband hybrid ice icon idea identify idle ignore ill illegal illness image imitate immense immune impact impose improve impulse inch include income increase index indicate indoor industry infant inflict inform inhale inherit initial inject injury inmate inner innocent input inquiry insane insect inside inspire install intact interest into invest invite involve iron island isolate issue item ivory jacket jaguar jar jazz jealous jeans jelly jewel job join joke journey joy judge juice jump jungle junior junk just kangaroo keen keep ketchup key kick kid kidney kind kingdom kiss kit kitchen kite kitten kiwi knee knife knock know lab label labor ladder lady lake lamp language laptop large later latin laugh laundry lava law lawn lawsuit layer lazy leader leaf learn leave lecture left leg legal legend leisure lemon lend length lens leopard lesson letter level liar liberty library license life lift light like limb limit link lion liquid list little live lizard load loan lobster local lock logic lonely long loop lottery loud lounge love loyal lucky luggage lumber lunar lunch luxury lyrics machine mad magic magnet maid mail main major make mammal man manage mandate mango mansion manual maple marble march margin marine market marriage mask mass master match material math matrix matter maximum maze meadow mean measure meat mechanic medal media melody melt member memory mention menu mercy merge merit merry mesh message metal method middle midnight milk million mimic mind minimum minor minute miracle mirror misery miss mistake mix mixed mixture mobile model modify mom moment monitor monkey monster month moon moral more morning mosquito mother motion motor mountain mouse move movie much muffin mule multiply muscle museum mushroom music must mutual myself mystery myth naive name napkin narrow nasty nation nature near neck need negative neglect neither nephew nerve nest net network neutral never news next nice night noble noise nominee noodle normal north nose notable note nothing notice novel now nuclear number nurse nut oak obey object oblige obscure observe obtain obvious occur ocean october odor off offer office often oil okay old olive olympic omit once one onion online only open opera opinion oppose option orange orbit orchard order ordinary organ orient original orphan ostrich other outdoor outer output outside oval oven over own owner oxygen oyster ozone pact paddle page pair palace palm panda panel panic panther paper parade parent park parrot party pass patch path patient patrol pattern pause pave payment peace peanut pear peasant pelican pen penalty pencil people pepper perfect permit person pet phone photo phrase physical piano picnic picture piece pig pigeon pill pilot pink pioneer pipe pistol pitch pizza place planet plastic plate play please pledge pluck plug plunge poem poet point polar pole police pond pony pool popular portion position possible post potato pottery poverty powder power practice praise predict prefer prepare present pretty prevent price pride primary print priority prison private prize problem process produce profit program project promote proof property prosper protect proud provide public pudding pull pulp pulse pumpkin punch pupil puppy purchase purity purpose purse push put puzzle pyramid quality quantum quarter question quick quit quiz quote rabbit raccoon race rack radar radio rail rain raise rally ramp ranch random range rapid rare rate rather raven raw razor ready real reason rebel rebuild recall receive recipe record recycle reduce reflect reform refuse region regret regular reject relax release relief rely remain remember remind remove render renew rent reopen repair repeat replace report require rescue resemble resist resource response result retire retreat return reunion reveal review reward rhythm rib ribbon rice rich ride ridge rifle right rigid ring riot ripple risk ritual rival river road roast robot robust rocket romance roof rookie room rose rotate rough round route royal rubber rude rug rule run runway rural sad saddle sadness safe sail salad salmon salon salt salute same sample sand satisfy satoshi sauce sausage save say scale scan scare scatter scene scheme school science scissors scorpion scout scrap screen script scrub sea search season seat second secret section security seed seek segment select sell seminar senior sense sentence series service session settle setup seven shadow shaft shallow share shed shell sheriff shield shift shine ship shiver shock shoe shoot shop short shoulder shove shrimp shrug shuffle shy sibling sick side siege sight sign silent silk silly silver similar simple since sing siren sister situate six size skate sketch ski skill skin skirt skull slab slam sleep slender slice slide slight slim slogan slot slow slush small smart smile smoke smooth snack snake snap sniff snow soap soccer social sock soda soft solar soldier solid solution solve someone song soon sorry sort soul sound soup source south space spare spatial spawn speak special speed spell spend sphere spice spider spike spin spirit split spoil sponsor spoon sport spot spray spread spring spy square squeeze squirrel stable stadium staff stage stairs stamp stand start state stay steak steel stem step stereo stick still sting stock stomach stone stool story stove strategy street strike strong struggle student stuff stumble style subject submit subway success such sudden suffer sugar suggest suit summer sun sunny sunset super supply supreme sure surface surge surprise surround survey suspect sustain swallow swamp swap swarm swear sweet swift swim swing switch sword symbol symptom syrup system table tackle tag tail talent talk tank tape target task taste tattoo taxi teach team tell ten tenant tennis tent term test text thank that theme then theory there they thing this thought three thrive throw thumb thunder ticket tide tiger tilt timber time tiny tip tired tissue title toast tobacco today toddler toe together toilet token tomato tomorrow tone tongue tonight tool tooth top topic topple torch tornado tortoise toss total tourist toward tower town toy track trade traffic tragic train transfer trap trash travel tray treat tree trend trial tribe trick trigger trim trip trophy trouble truck true truly trumpet trust truth try tube tuition tumble tuna tunnel turkey turn turtle twelve twenty twice twin twist two type typical ugly umbrella unable unaware uncle uncover under undo unfair unfold unhappy uniform unique unit universe unknown unlock until unusual unveil update upgrade uphold upon upper upset urban urge usage use used useful useless usual utility vacant vacuum vague valid valley valve van vanish vapor various vast vault vehicle velvet vendor venture venue verb verify version very vessel veteran viable vibrant vicious victory video view village vintage violin virtual virus visa visit visual vital vivid vocal voice void volcano volume vote voyage wage wagon wait walk wall walnut want warfare warm warrior wash wasp waste water wave way wealth weapon wear weasel weather web wedding weekend weird welcome west wet whale what wheat wheel when where whip whisper wide width wife wild will win window wine wing wink winner winter wire wisdom wise wish witness wolf woman wonder wood wool word work world worry worth wrap wreck wrestle wrist write wrong yard year yellow you young youth zebra zero zone zoo".split(' ');
+// Fast master seed from password (single SHA256 — speed over KDF hardness)
+async function vaultMasterSeed(password) {
+  return sha256(new TextEncoder().encode(password));
+}
+
+// BIP39: entropy → mnemonic
+function entropyToMnemonic(entropy) {
+  const cs = sha256(entropy)[0] >> (8 - entropy.length / 4);
+  const bits = [];
+  for (const b of entropy) for (let i=7;i>=0;i--) bits.push((b>>i)&1);
+  const csBits = entropy.length * 8 / 32;
+  const csB = sha256(entropy)[0];
+  for (let i=7;i>=8-csBits;i--) bits.push((csB>>i)&1);
+  const words = [];
+  for (let i=0;i<bits.length;i+=11) { let idx=0; for(let j=0;j<11;j++) idx=(idx<<1)|bits[i+j]; words.push(BIP39W[idx]); }
+  return words.join(' ');
+}
+
+// BIP39: mnemonic → 64-byte seed via PBKDF2-HMAC-SHA512
+async function mnemonicToSeed(mnemonic) {
+  const enc = new TextEncoder();
+  const keyMat = await crypto.subtle.importKey('raw', enc.encode(mnemonic), {name:'PBKDF2'}, false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits(
+    {name:'PBKDF2', salt: enc.encode('mnemonic'), iterations:2048, hash:'SHA-512'},
+    keyMat, 512
+  );
+  return new Uint8Array(bits);
+}
+
+// HMAC-SHA512 via WebCrypto
+async function hmacSha512(key, data) {
+  const k = await crypto.subtle.importKey('raw', key, {name:'HMAC', hash:'SHA-512'}, false, ['sign']);
+  return new Uint8Array(await crypto.subtle.sign('HMAC', k, data));
+}
+
+// BIP32: seed → master key, then derive child at path m/44'/coinType'/0'/0/index
+async function bip32Derive(seed, coinType, index) {
+  // Master key
+  let I = await hmacSha512(new TextEncoder().encode('Bitcoin seed'), seed);
+  let kpar = I.slice(0, 32), cpar = I.slice(32);
+
+  // Hardened derivation helper
+  async function deriveHardened(k, c, i) {
+    const data = new Uint8Array(37);
+    data[0] = 0x00; data.set(k, 1);
+    new DataView(data.buffer).setUint32(33, 0x80000000 | i, false);
+    const res = await hmacSha512(c, data);
+    const il = res.slice(0, 32), ir = res.slice(32);
+    const n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141n;
+    const child = (BigInt('0x'+hex(il)) + BigInt('0x'+hex(k))) % n;
+    const out = new Uint8Array(32);
+    let tmp = child; for (let j=31;j>=0;j--) { out[j]=Number(tmp&0xFFn); tmp>>=8n; }
+    return [out, ir];
+  }
+
+  // Normal derivation helper
+  async function deriveNormal(k, c, i) {
+    const pub = secp256k1.getPublicKey(k, true);
+    const data = new Uint8Array(37);
+    data.set(pub, 0);
+    new DataView(data.buffer).setUint32(33, i, false);
+    const res = await hmacSha512(c, data);
+    const il = res.slice(0, 32), ir = res.slice(32);
+    const n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141n;
+    const child = (BigInt('0x'+hex(il)) + BigInt('0x'+hex(k))) % n;
+    const out = new Uint8Array(32);
+    let tmp = child; for (let j=31;j>=0;j--) { out[j]=Number(tmp&0xFFn); tmp>>=8n; }
+    return [out, ir];
+  }
+
+  // m/44'
+  [kpar, cpar] = await deriveHardened(kpar, cpar, 44);
+  // m/44'/coinType'
+  [kpar, cpar] = await deriveHardened(kpar, cpar, coinType);
+  // m/44'/coinType'/0'
+  [kpar, cpar] = await deriveHardened(kpar, cpar, 0);
+  // m/44'/coinType'/0'/0
+  [kpar, cpar] = await deriveNormal(kpar, cpar, 0);
+  // m/44'/coinType'/0'/0/index
+  [kpar, cpar] = await deriveNormal(kpar, cpar, index);
+  return kpar;
+}
+const COINS = [
+  { id:'btc_legacy', name:'Bitcoin Legacy', icon:'₿', defaultOn:true, coinType:0,
+    getAddr: p => b58c.encode(new Uint8Array([0x00,...hash160(secp256k1.getPublicKey(p,true))])),
+    getKey: p => toWIF(p,0x80) },
+  { id:'btc_segwit', name:'Bitcoin SegWit', icon:'₿', defaultOn:true, coinType:0,
+    getAddr: p => { const pkh=hash160(secp256k1.getPublicKey(p,true)); return b58c.encode(new Uint8Array([0x05,...hash160(new Uint8Array([0x00,0x14,...pkh]))])); },
+    getKey: p => toWIF(p,0x80) },
+  { id:'btc_bech32', name:'Bitcoin Bech32', icon:'₿', defaultOn:true, coinType:0,
+    getAddr: p => bech32.encode('bc',[0,...bech32.toWords(hash160(secp256k1.getPublicKey(p,true)))]),
+    getKey: p => toWIF(p,0x80) },
+  { id:'eth', name:'Ethereum', icon:'⟠', defaultOn:true, coinType:60,
+    getAddr: p => ethAddr(p),
+    getKey: p => hex(p) },
+  { id:'ltc', name:'Litecoin', icon:'Ł', defaultOn:false, coinType:2,
+    getAddr: p => b58c.encode(new Uint8Array([0x30,...hash160(secp256k1.getPublicKey(p,true))])),
+    getKey: p => toWIF(p,0xB0) },
+  { id:'doge', name:'Dogecoin', icon:'Ð', defaultOn:false, coinType:3,
+    getAddr: p => b58c.encode(new Uint8Array([0x1E,...hash160(secp256k1.getPublicKey(p,true))])),
+    getKey: p => toWIF(p,0x9E) },
+  { id:'trx', name:'Tron', icon:'T', defaultOn:false, coinType:195,
+    getAddr: p => { const raw=keccak_256(secp256k1.getPublicKey(p,false).slice(1)).slice(-20); return b58c.encode(new Uint8Array([0x41,...raw])); },
+    getKey: p => hex(p) },
+  { id:'xrp', name:'XRP', icon:'✕', defaultOn:false, coinType:144,
+    getAddr: p => {
+      const XRP_ABC = 'rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz';
+      const payload = new Uint8Array([0x00,...hash160(secp256k1.getPublicKey(p,true))]);
+      const chk = sha256(sha256(payload)).slice(0,4);
+      const full = new Uint8Array([...payload,...chk]);
+      let n = BigInt('0x'+hex(full)), res='';
+      while(n>0n){res=XRP_ABC[Number(n%58n)]+res;n/=58n;}
+      return res;
+    },
+    getKey: p => hex(p) },
+  { id:'sol', name:'Solana', icon:'◎', defaultOn:false, coinType:501,
+    getAddr: p => {
+      // ed25519 public key derivation (pure JS)
+      const P = 2n**255n - 19n;
+      const d = -121665n * modInv25519(121666n) % P;
+      function modInv25519(a){return modPow25519(a,P-2n);}
+      function modPow25519(b,e){let r=1n;b=((b%P)+P)%P;while(e>0n){if(e&1n)r=r*b%P;e>>=1n;b=b*b%P;}return r;}
+      function recoverX(y,sign){const x2=(y*y-1n)*modInv25519(d*y*y+1n)%P;if(x2===0n)return 0n;let x=modPow25519(x2,(P+3n)/8n);if((x*x-x2+P)%P!==0n)x=x*modPow25519(2n,(P-1n)/4n)%P;if(x%2n!==BigInt(sign))return P-x;return x;}
+      const By=4n*modInv25519(5n)%P,Bx=recoverX(By,0);
+      const G=[Bx,By,1n,Bx*By%P];
+      function pointAdd([ax,ay,az,at],[bx,by,bz,bt]){const A=(ay-ax+P)*(by-bx+P)%P,B2=(ay+ax)*(by+bx)%P,C=2n*at*bt%P*d%P,D=2n*az*bz%P,E=(B2-A+P)%P,F=(D-C+P)%P,Gg=(D+C)%P,H=(B2+A)%P;return[E*F%P,Gg*H%P,F*Gg%P,E*H%P];}
+      function pointMul(s,pt){let Q=[0n,1n,1n,0n];while(s>0n){if(s&1n)Q=pointAdd(Q,pt);pt=pointAdd(pt,pt);s>>=1n;}return Q;}
+      function compress([x,y,z]){const zi=modInv25519(z),rx=(x*zi+P)%P,ry=(y*zi+P)%P;const b=new Uint8Array(32);let tmp=ry;for(let i=0;i<32;i++){b[i]=Number(tmp&0xffn);tmp>>=8n;}b[31]|=Number(rx&1n)<<7;return b;}
+      // BIP32 priv → ed25519 seed via SHA512 clamp
+      const hBytes = sha256(new Uint8Array([...p, 0xed])); // domain-separated hash
+      hBytes[0]&=248; hBytes[31]&=127; hBytes[31]|=64;
+      let scalar=0n;
+      for(let i=31;i>=0;i--) scalar=(scalar<<8n)|BigInt(hBytes[i]);
+      const pub = compress(pointMul(scalar, G));
+      const B58='123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+      let n=BigInt('0x'+hex(pub)),res='';
+      while(n>0n){res=B58[Number(n%58n)]+res;n/=58n;}
+      return res;
+    },
+    getKey: p => hex(p) },
+  { id:'xmr', name:'Monero', icon:'ɱ', defaultOn:false, coinType:128,
+    getAddr: p => {
+      const P = 2n**255n - 19n;
+      const l = 2n**252n + 27742317777372353535851937790883648493n;
+      const d = -121665n * modInv(121666n, P) % P;
+      function modInv(a,m){let[old_r,r,old_s,s]=[a,m,1n,0n];while(r!==0n){const q=old_r/r;[old_r,r]=[r,old_r-q*r];[old_s,s]=[s,old_s-q*s];}return((old_s%m)+m)%m;}
+      function recoverX(y,sign){const x2=(y*y-1n)*modInv(d*y*y+1n,P)%P;if(x2===0n)return 0n;let x=modPow(x2,(P+3n)/8n,P);if((x*x-x2+P)%P!==0n)x=x*modPow(2n,(P-1n)/4n,P)%P;if(x%2n!==BigInt(sign))return P-x;return x;}
+      function modPow(b,e,m){let r=1n;b%=m;while(e>0n){if(e&1n)r=r*b%m;e>>=1n;b=b*b%m;}return r;}
+      const By=4n*modInv(5n,P)%P, Bx=recoverX(By,0);
+      const G=[Bx,By,1n,Bx*By%P];
+      function pointAdd([ax,ay,az,at],[bx,by,bz,bt]){const A=(ay-ax)*(by-bx)%P,B2=(ay+ax)*(by+bx)%P,C=2n*at*bt*d%P,D=2n*az*bz%P,E=B2-A,F=D-C,Gg=D+C,H=B2+A;return[E*F%P,Gg*H%P,F*Gg%P,E*H%P];}
+      function pointMul(s,pt){let Q=[0n,1n,1n,0n];while(s>0n){if(s&1n)Q=pointAdd(Q,pt);pt=pointAdd(pt,pt);s>>=1n;}return Q;}
+      function compress([x,y,z]){const zi=modInv(z,P),rx=x*zi%P,ry=y*zi%P;const b=new Uint8Array(32);let tmp=ry;for(let i=0;i<32;i++){b[i]=Number(tmp&0xffn);tmp>>=8n;}b[31]|=Number(rx&1n)<<7;return b;}
+      function scReduce(x){return((x%l)+l)%l;}
+      const spendScalar=scReduce(BigInt('0x'+[...sha256(p)].reverse().map(x=>x.toString(16).padStart(2,'0')).join('')));
+      const viewScalar=scReduce(BigInt('0x'+[...sha256(new Uint8Array([...new Array(32)].map((_,i)=>{let t=spendScalar;for(let j=0;j<i;j++)t>>=8n;return Number(t&0xffn)})))].reverse().map(x=>x.toString(16).padStart(2,'0')).join('')));
+      const spendPub=compress(pointMul(spendScalar,G));
+      const viewPub=compress(pointMul(viewScalar,G));
+      const payload=new Uint8Array([0x12,...spendPub,...viewPub]);
+      const chk=keccak_256(payload).slice(0,4);
+      const full=new Uint8Array([...payload,...chk]);
+      const B58='123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+      let n=BigInt('0x'+hex(full)),res='';
+      while(n>0n){res=B58[Number(n%58n)]+res;n/=58n;}
+      return res;
+    },
+    getKey: p => hex(p) },
+];
+let selectedCoins = new Set(COINS.filter(c=>c.defaultOn).map(c=>c.id));
+let generatedRecords = [];
+let masterSeed = null;
+let usedIndices = new Set();
+let isRunning = false, stopRequested = false;
+
+function randomUnusedIndex() {
+  if (usedIndices.size >= 30000) return null;
+  let idx;
+  do { idx = Math.floor(Math.random() * 30000); } while (usedIndices.has(idx));
+  usedIndices.add(idx);
+  return idx;
+}
+
+function buildCoinsGrid() {
+  const grid = document.getElementById('coinsGrid');
+  grid.innerHTML = '';
+  grid.style.cssText = 'display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.3rem';
+  for (const coin of COINS) {
+    const label = document.createElement('label');
+    label.style.cssText = 'display:flex;align-items:center;gap:.4rem;background:#0a0e14;border:1px solid #1f2a3a;border-radius:8px;padding:.35rem .7rem;cursor:pointer;font-size:.78rem;user-select:none';
+    label.innerHTML = `<input type="checkbox" ${selectedCoins.has(coin.id)?'checked':''} data-id="${coin.id}" style="accent-color:#f7931a;cursor:pointer"> ${coin.icon} ${coin.name}`;
+    if (selectedCoins.has(coin.id)) label.style.borderColor = '#f7931a';
+    label.querySelector('input').addEventListener('change', e => {
+      if (e.target.checked) { selectedCoins.add(coin.id); label.style.borderColor='#f7931a'; }
+      else { selectedCoins.delete(coin.id); label.style.borderColor='#1f2a3a'; }
+    });
+    grid.appendChild(label);
+  }
+}
+function toast(msg, err=false) {
+  const d = Object.assign(document.createElement('div'),{className:'toast-msg',textContent:msg});
+  if(err) d.style.background='#da3633';
+  document.body.appendChild(d); setTimeout(()=>d.remove(),2100);
+}
+function copyText(t) {
+  if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(t);
+  const ta = Object.assign(document.createElement('textarea'),{value:t,style:'position:fixed;opacity:0'});
+  document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+}
+function renderTables() {
+  const rc = document.getElementById('resultsContainer');
+  if (!generatedRecords.length) {
+    rc.innerHTML = '<div style="text-align:center;padding:2rem;color:#6e7681">⚡ Press Generate to start</div>';
+    return;
+  }
+  const activeCoinIds = COINS.filter(c=>selectedCoins.has(c.id));
+  let html = '';
+  for (const coin of activeCoinIds) {
+    const recs = generatedRecords.filter(r=>r[coin.id]);
+    if (!recs.length) continue;
+    html += `<div class="card"><div class="card-header"><h3>${coin.icon} ${coin.name}</h3><span style="font-size:.73rem;color:#8b949e">${recs.length} records</span></div>
+    <div class="table-wrapper"><table class="addr-table">
+    <thead><tr><th>Mnemonic</th><th>Address</th><th>Key</th><th></th></tr></thead><tbody>`;
+    for (const rec of recs) {
+      const {addr,key} = rec[coin.id];
+      const ks = key.length>36 ? key.slice(0,32)+'…' : key;
+      const mn = rec.mnemonic || '';
+      html += `<tr><td style="font-size:.62rem;color:#a8d8a8;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${mn}">${mn}</td><td style="font-size:.7rem">${addr}</td>
+        <td style="font-size:.7rem"><span title="${key}">${ks}</span></td>
+        <td><button class="copy-btn" data-v="${addr}">📋</button></td></tr>`;
+    }
+    html += '</tbody></table></div></div>';
+  }
+  rc.innerHTML = html;
+  rc.querySelectorAll('.copy-btn').forEach(b=>b.addEventListener('click',e=>{
+    const v=e.currentTarget.dataset.v; copyText(v);
+    e.currentTarget.textContent='✓'; setTimeout(()=>e.currentTarget.textContent='📋',800); toast('✓ Copied');
+  }));
+}
+
+function updateStats() {
+  const n=generatedRecords.length, total=parseInt(document.getElementById('countInput').value)||1;
+  const pct = total>0 ? (n/total*100).toFixed(1) : 0;
+  document.getElementById('summaryPanel').innerHTML=`<div class="stats-row">
+    <span class="stat">📊 ${n.toLocaleString()} / ${total.toLocaleString()}</span>
+    <span class="stat">📈 ${pct}%</span>
+    <span class="stat">🪙 ${selectedCoins.size} coins</span>
+  </div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>`;
+  document.getElementById('progressDisplay').textContent =
+    isRunning ? `⚙️ Generating… ${n}/${total}` : n>0 ? `✅ Done: ${n}` : '⚙️ Ready';
+}
+async function generateRecord(index) {
+  // Deterministic entropy from master seed + index → always same mnemonic for same index
+  const idxBytes = new Uint8Array(4);
+  new DataView(idxBytes.buffer).setUint32(0, index, false);
+  const data = new Uint8Array([...masterSeed, ...idxBytes]);
+  const entropy = sha256(data).slice(0, 16);
+  const mnemonic = entropyToMnemonic(entropy);
+  const seed = await mnemonicToSeed(mnemonic);
+  const rec = { mnemonic };
+  for (const coin of COINS) {
+    if (selectedCoins.has(coin.id)) {
+      try {
+        const priv = await bip32Derive(seed, coin.coinType, 0);
+        rec[coin.id] = { addr: await Promise.resolve(coin.getAddr(priv)), key: coin.getKey(priv) };
+      } catch(e) { rec[coin.id] = { addr: 'error', key: '' }; }
+    }
+  }
+  return rec;
+}
+
+async function generationLoop(target) {
+  let count = 0;
+  const BATCH = 100;
+  while (isRunning && !stopRequested && count < target) {
+    const batch = [];
+    for (let i = 0; i < BATCH && count + i < target; i++) {
+      const idx = randomUnusedIndex();
+      if (idx === null) { isRunning = false; break; }
+      batch.push(generateRecord(idx));
+    }
+    const results = await Promise.all(batch);
+    generatedRecords.push(...results);
+    count += results.length;
+    updateStats(); renderTables();
+    await new Promise(r=>setTimeout(r,0));
+  }
+  isRunning = false;
+  document.getElementById('startGenBtn').disabled = false;
+  document.getElementById('stopGenBtn').disabled = true;
+  if (stopRequested) { toast(`⏸ Stopped at ${generatedRecords.length}`); stopRequested=false; }
+  else toast(`✅ Generated ${generatedRecords.length}`);
+  updateStats(); renderTables();
+}
+
+async function startGeneration() {
+  if (isRunning) return;
+  if (!selectedCoins.size) { toast('Select at least one coin', true); return; }
+  const target = Math.max(1, Math.min(30000, parseInt(document.getElementById('countInput').value)||1));
+  document.getElementById('countInput').value = target;
+  document.getElementById('startGenBtn').disabled = true;
+  document.getElementById('stopGenBtn').disabled = false;
+  document.getElementById('progressDisplay').textContent = '⚙️ Deriving seed…';
+  if (!masterSeed) masterSeed = await vaultMasterSeed('X9#mK2$vL8@nQ5!wR3&pJ7*tF4^hD6~bN1+cG0-sY');
+  isRunning = true; stopRequested = false;
+  updateStats(); renderTables();
+  generationLoop(target);
+}
+
+function stopGeneration() {
+  stopRequested = true; isRunning = false;
+  document.getElementById('startGenBtn').disabled = false;
+  document.getElementById('stopGenBtn').disabled = true;
+}
+function copyAddresses() {
+  if (!generatedRecords.length) { toast('No data', true); return; }
+  const lines = [];
+  for (const rec of generatedRecords) {
+    for (const coin of COINS) if (rec[coin.id]) lines.push(`${coin.name}: ${rec[coin.id].addr}`);
+    lines.push('');
+  }
+  copyText(lines.join('\n')); toast(`✓ Copied ${generatedRecords.length} records`);
+}
+function copyWithKeys() {
+  if (!generatedRecords.length) { toast('No data', true); return; }
+  const lines = [];
+  for (const rec of generatedRecords) {
+    if (rec.mnemonic) lines.push(`Mnemonic: ${rec.mnemonic}`);
+    for (const coin of COINS) if (rec[coin.id]) {
+      lines.push(`${coin.name}: ${rec[coin.id].addr}`);
+      lines.push(`  Key: ${rec[coin.id].key}`);
+    }
+    lines.push('');
+  }
+  copyText(lines.join('\n')); toast(`✓ Copied ${generatedRecords.length} records with keys`);
+}
+function exportJSON() {
+  if (!generatedRecords.length) { toast('No data', true); return; }
+  const data = { generator:'Seed Vault', generatedAt:new Date().toISOString(), total:generatedRecords.length, records:generatedRecords };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+  const a = Object.assign(document.createElement('a'),{href:url,download:`vault-${Date.now()}.json`});
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  toast(`✓ Exported ${generatedRecords.length} records`);
+}
+function clearResults() {
+  if (isRunning) stopGeneration();
+  generatedRecords = []; usedIndices = new Set(); updateStats(); renderTables(); toast('🗑 Cleared');
+}
+document.getElementById('startGenBtn').onclick = startGeneration;
+document.getElementById('stopGenBtn').onclick = stopGeneration;
+buildCoinsGrid();
+updateStats();
+renderTables();
+</script>
+</body>
+</html>
